@@ -5,8 +5,6 @@ INTER_SESSION_TIME=10
 ITERATIONS=15
 TRAINING_TRIALS_PER_ITERATION=1
 PROBING_TRIALS_PER_ITERATION=1
-TRAINING_SESSION_TIME=300
-PROBING_SESSION_TIME=300
 OPENLOOP_TRAINING_ITERATIONS=10
 OPENLOOP_TRAINING_SESSION_TIME=300
 BASELINE_ITERATIONS=0
@@ -18,8 +16,6 @@ while [[ "$#" -gt 0 ]]; do
         --iterations) ITERATIONS="$2"; shift ;;
         --training-trials-per-iteration) TRAINING_TRIALS_PER_ITERATION="$2"; shift ;;
         --probing-trials-per-iteration) PROBING_TRIALS_PER_ITERATION="$2"; shift ;;
-        --training-session-time) TRAINING_SESSION_TIME="$2"; shift ;;
-        --probing-session-time) PROBING_SESSION_TIME="$2"; shift ;;
         --inter-session-time) INTER_SESSION_TIME="$2"; shift ;;
         --baseline-session-time) BASELINE_SESSION_TIME="$2"; shift ;;
         --baseline-iterations) BASELINE_ITERATIONS="$2"; shift ;;
@@ -184,13 +180,13 @@ for ((iter=1; iter<=ITERATIONS; iter++)); do
 
     # ---- Training trials in this iteration ----
     for ((t=1; t<=TRAINING_TRIALS_PER_ITERATION; t++)); do
-        if (( TRAINING_SESSION_TIME <= 0 )); then continue; fi
         echo "--- Iteration $iter: Training trial $t of $TRAINING_TRIALS_PER_ITERATION ---" | tee -a "$SCRIPT_LOG"
         activate_conda
 
         echo "Running calc_path.py..." | tee -a "$SCRIPT_LOG"
         python3 "$calc_path_exe" >> "$CALC_PATH_LOG" 2>&1 &
-        PIDS+=($!)
+        CALC_PATH_PID=$!
+        PIDS+=($CALC_PATH_PID)
 
         echo "Running con_led.py..." | tee -a "$SCRIPT_LOG"
         python3 "$con_led_exe" --zones "0:20,1:100" >> "$CON_LED_LOG" 2>&1 &
@@ -204,7 +200,9 @@ for ((iter=1; iter<=ITERATIONS; iter++)); do
         "$UNITY_EXE" --csvDirectory "$TRAINING_CSV_DIR" >> "$UNITY_TRAINING_LOG" 2>&1 &
         PIDS+=($!)
 
-        countdown "$TRAINING_SESSION_TIME"
+        echo "Training trial: waiting for fly to reach end (coordination > 99)..." | tee -a "$SCRIPT_LOG"
+        wait "$CALC_PATH_PID" 2>/dev/null || true
+        echo "Fly reached end. Stopping trial." | tee -a "$SCRIPT_LOG"
         stop_processes
         echo "Waiting for $INTER_SESSION_TIME seconds before next trial..." | tee -a "$SCRIPT_LOG"
         countdown "$INTER_SESSION_TIME"
@@ -212,13 +210,13 @@ for ((iter=1; iter<=ITERATIONS; iter++)); do
 
     # ---- Probing trials in this iteration ----
     for ((p=1; p<=PROBING_TRIALS_PER_ITERATION; p++)); do
-        if (( PROBING_SESSION_TIME <= 0 )); then continue; fi
         echo "--- Iteration $iter: Probing trial $p of $PROBING_TRIALS_PER_ITERATION ---" | tee -a "$SCRIPT_LOG"
         activate_conda
 
         echo "Running calc_path.py..." | tee -a "$SCRIPT_LOG"
         python3 "$calc_path_exe" >> "$CALC_PATH_LOG" 2>&1 &
-        PIDS+=($!)
+        CALC_PATH_PID=$!
+        PIDS+=($CALC_PATH_PID)
 
         echo "Running con_led.py..." | tee -a "$SCRIPT_LOG"
         python3 "$con_led_exe" --zones "0:none,1:none" >> "$CON_LED_LOG" 2>&1 &
@@ -232,7 +230,9 @@ for ((iter=1; iter<=ITERATIONS; iter++)); do
         "$UNITY_EXE" --csvDirectory "$PROBING_CSV_DIR" >> "$UNITY_PROBING_LOG" 2>&1 &
         PIDS+=($!)
 
-        countdown "$PROBING_SESSION_TIME"
+        echo "Probing trial: waiting for fly to reach end (coordination > 99)..." | tee -a "$SCRIPT_LOG"
+        wait "$CALC_PATH_PID" 2>/dev/null || true
+        echo "Fly reached end. Stopping trial." | tee -a "$SCRIPT_LOG"
         stop_processes
         echo "Waiting for $INTER_SESSION_TIME seconds before next trial..." | tee -a "$SCRIPT_LOG"
         countdown "$INTER_SESSION_TIME"

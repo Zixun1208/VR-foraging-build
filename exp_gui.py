@@ -24,8 +24,6 @@ paths = {
     "csv_main_dir": "",
     "openloop_training_time": "0",
     "baseline_time": "300",
-    "training_time": "300",
-    "probing_session_time": "300",
     "inter_session_time": "60",
     "openloop_training_iterations": "0",
     "baseline_iterations": "0",
@@ -59,8 +57,6 @@ def load_config():
                 if key in entry_vars:
                     entry_vars[key].set(paths[key])
         baseline_time_var.set(saved.get("baseline_time", "300"))
-        training_time_var.set(saved.get("training_time", "300"))
-        probing_time_var.set(saved.get("probing_session_time", "300"))
         inter_time_var.set(saved.get("inter_session_time", "60"))
         baseline_iterations_var.set(saved.get("baseline_iterations", "0"))
         iterations_var.set(saved.get("iterations", saved.get("training_iterations", "15")))
@@ -73,8 +69,6 @@ def save_config():
     for key in entry_vars:
         paths[key] = entry_vars[key].get()
     paths["baseline_time"] = baseline_time_var.get()
-    paths["training_time"] = training_time_var.get()
-    paths["probing_session_time"] = probing_time_var.get()
     paths["inter_session_time"] = inter_time_var.get()
     paths["baseline_iterations"] = baseline_iterations_var.get()
     paths["iterations"] = iterations_var.get()
@@ -117,8 +111,6 @@ def add_param(label, var, default):
     row += 1
 
 baseline_time_var = tk.StringVar()
-training_time_var = tk.StringVar()
-probing_time_var = tk.StringVar()
 inter_time_var = tk.StringVar()
 baseline_iterations_var = tk.StringVar()
 iterations_var = tk.StringVar()
@@ -131,8 +123,6 @@ add_param("Openloop Training Session Time (s):", openloop_training_time_var, "0"
 add_param("Openloop Training Iterations:", openloop_training_iterations_var, "0")
 add_param("Baseline Session Time (s):", baseline_time_var, "300")
 add_param("Baseline Iterations:", baseline_iterations_var, "0")
-add_param("Training Session Time (s):", training_time_var, "300")
-add_param("Probing Session Time (s):", probing_time_var, "300")
 add_param("Iterations:", iterations_var, "15")
 add_param("Training trials per iteration:", training_trials_per_iter_var, "1")
 add_param("Probing trials per iteration:", probing_trials_per_iter_var, "1")
@@ -156,8 +146,6 @@ def run_experiment():
     global process
     baseline_time = baseline_time_var.get()
     baseline_iterations = baseline_iterations_var.get()
-    training_time = training_time_var.get()
-    probing_time = probing_time_var.get()
     inter_session_time = inter_time_var.get()
     iterations = iterations_var.get()
     training_trials_per_iter = training_trials_per_iter_var.get()
@@ -185,8 +173,6 @@ def run_experiment():
         "bash", paths["bash_script"],
         "--baseline-session-time", baseline_time,
         "--baseline-iterations", baseline_iterations,
-        "--training-session-time", training_time,
-        "--probing-session-time", probing_time,
         "--iterations", iterations,
         "--training-trials-per-iteration", training_trials_per_iter,
         "--probing-trials-per-iteration", probing_trials_per_iter,

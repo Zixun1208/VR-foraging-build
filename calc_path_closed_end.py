@@ -67,8 +67,13 @@ while True:
 
     # Update z with clamp
     new_z = z + gain_dz * dz
-    if new_z > 99.9:
-        z = 99.9
+    if new_z > 99:
+        # Fly reached end of path: send final position and exit so trial terminates
+        z = min(new_z, 99.9)
+        send_data = f"{z:.1f},{x:.1f},{r:.1f}".encode()
+        print(send_data.decode())
+        send_socket.sendto(send_data, send_addr)
+        break
     elif new_z < 0.01:
         z = 0.01
     else:
