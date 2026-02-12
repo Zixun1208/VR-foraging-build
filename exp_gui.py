@@ -19,12 +19,19 @@ paths = {
     "fictrac_config": "",
     "calc_path_py": "",
     "con_led_py": "",
+    "openloop_sim_py": "",
     "working_dir": "",
     "csv_main_dir": "",
+    "openloop_training_time": "0",
     "baseline_time": "300",
     "training_time": "300",
-    "iterations": "30",
-    "inter_session_time": "60"
+    "probing_session_time": "300",
+    "inter_session_time": "60",
+    "openloop_training_iterations": "0",
+    "baseline_iterations": "0",
+    "iterations": "15",
+    "training_trials_per_iteration": "1",
+    "probing_trials_per_iteration": "1"
 }
 
 # Setup dark style
@@ -53,16 +60,28 @@ def load_config():
                     entry_vars[key].set(paths[key])
         baseline_time_var.set(saved.get("baseline_time", "300"))
         training_time_var.set(saved.get("training_time", "300"))
-        iterations_var.set(saved.get("iterations", "30"))
+        probing_time_var.set(saved.get("probing_session_time", "300"))
         inter_time_var.set(saved.get("inter_session_time", "60"))
+        baseline_iterations_var.set(saved.get("baseline_iterations", "0"))
+        iterations_var.set(saved.get("iterations", saved.get("training_iterations", "15")))
+        training_trials_per_iter_var.set(saved.get("training_trials_per_iteration", "1"))
+        probing_trials_per_iter_var.set(saved.get("probing_trials_per_iteration", "1"))
+        openloop_training_time_var.set(saved.get("openloop_training_time", "0"))
+        openloop_training_iterations_var.set(saved.get("openloop_training_iterations", "0"))
 
 def save_config():
     for key in entry_vars:
         paths[key] = entry_vars[key].get()
     paths["baseline_time"] = baseline_time_var.get()
     paths["training_time"] = training_time_var.get()
-    paths["iterations"] = iterations_var.get()
+    paths["probing_session_time"] = probing_time_var.get()
     paths["inter_session_time"] = inter_time_var.get()
+    paths["baseline_iterations"] = baseline_iterations_var.get()
+    paths["iterations"] = iterations_var.get()
+    paths["training_trials_per_iteration"] = training_trials_per_iter_var.get()
+    paths["probing_trials_per_iteration"] = probing_trials_per_iter_var.get()
+    paths["openloop_training_time"] = openloop_training_time_var.get()
+    paths["openloop_training_iterations"] = openloop_training_iterations_var.get()
     with open(CONFIG_FILE, "w") as f:
         json.dump(paths, f, indent=2)
     messagebox.showinfo("Saved", "Default paths saved!")
@@ -74,9 +93,10 @@ file_fields = [
     ("FicTrac Executable", "fictrac_exe", False),
     ("FicTrac Config", "fictrac_config", False),
     ("calc_path.py", "calc_path_py", False),
-    ("con_led0.py", "con_led_py", False),
+    ("con_led.py", "con_led_py", False),
     ("Working Directory", "working_dir", True),
     ("CSV Main Directory", "csv_main_dir", True),
+    ("openloop_sim.py", "openloop_sim_py", False)
 ]
 
 row = 0
@@ -98,12 +118,24 @@ def add_param(label, var, default):
 
 baseline_time_var = tk.StringVar()
 training_time_var = tk.StringVar()
-iterations_var = tk.StringVar()
+probing_time_var = tk.StringVar()
 inter_time_var = tk.StringVar()
+baseline_iterations_var = tk.StringVar()
+iterations_var = tk.StringVar()
+training_trials_per_iter_var = tk.StringVar()
+probing_trials_per_iter_var = tk.StringVar()
+openloop_training_time_var = tk.StringVar()
+openloop_training_iterations_var = tk.StringVar()
 
+add_param("Openloop Training Session Time (s):", openloop_training_time_var, "0")
+add_param("Openloop Training Iterations:", openloop_training_iterations_var, "0")
 add_param("Baseline Session Time (s):", baseline_time_var, "300")
+add_param("Baseline Iterations:", baseline_iterations_var, "0")
 add_param("Training Session Time (s):", training_time_var, "300")
-add_param("Iterations:", iterations_var, "30")
+add_param("Probing Session Time (s):", probing_time_var, "300")
+add_param("Iterations:", iterations_var, "15")
+add_param("Training trials per iteration:", training_trials_per_iter_var, "1")
+add_param("Probing trials per iteration:", probing_trials_per_iter_var, "1")
 add_param("Inter-session Time (s):", inter_time_var, "60")
 
 # Buttons
@@ -123,9 +155,15 @@ log_output.grid(row=row, column=0, columnspan=3, padx=10, pady=10)
 def run_experiment():
     global process
     baseline_time = baseline_time_var.get()
+    baseline_iterations = baseline_iterations_var.get()
     training_time = training_time_var.get()
-    iterations = iterations_var.get()
+    probing_time = probing_time_var.get()
     inter_session_time = inter_time_var.get()
+    iterations = iterations_var.get()
+    training_trials_per_iter = training_trials_per_iter_var.get()
+    probing_trials_per_iter = probing_trials_per_iter_var.get()
+    openloop_training_time = openloop_training_time_var.get()
+    openloop_training_iterations = openloop_training_iterations_var.get()
 
     if not os.path.isfile(paths["bash_script"]):
         messagebox.showerror("Error", f"Bash script not found: {paths['bash_script']}")
@@ -139,15 +177,22 @@ def run_experiment():
         "CALC_PATH": paths["calc_path_py"],
         "CON_LED": paths["con_led_py"],
         "WORKING_DIR": paths["working_dir"],
-        "CSV_MAIN_DIR": paths["csv_main_dir"]
+        "CSV_MAIN_DIR": paths["csv_main_dir"],
+        "OPENLOOP_SIM": paths["openloop_sim_py"]
     })
 
     command = [
         "bash", paths["bash_script"],
         "--baseline-session-time", baseline_time,
+        "--baseline-iterations", baseline_iterations,
         "--training-session-time", training_time,
+        "--probing-session-time", probing_time,
         "--iterations", iterations,
-        "--inter-session-time", inter_session_time
+        "--training-trials-per-iteration", training_trials_per_iter,
+        "--probing-trials-per-iteration", probing_trials_per_iter,
+        "--inter-session-time", inter_session_time,
+        "--openloop-training-session-time", openloop_training_time,
+        "--openloop-training-iterations", openloop_training_iterations
     ]
 
     start_button.config(state="disabled")

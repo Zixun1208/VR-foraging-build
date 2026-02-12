@@ -2,25 +2,27 @@
 
 # Default values for parameters
 INTER_SESSION_TIME=10
-OPENLOOP_TRAINING_ITERATIONS=10
-BASELINE_ITERATIONS=0
-TRAINING_ITERATIONS=15
-PROBING_ITERATIONS=5
-OPENLOOP_TRAINING_SESSION_TIME=300
-BASELINE_SESSION_TIME=300
+ITERATIONS=15
+TRAINING_TRIALS_PER_ITERATION=1
+PROBING_TRIALS_PER_ITERATION=1
 TRAINING_SESSION_TIME=300
 PROBING_SESSION_TIME=300
+OPENLOOP_TRAINING_ITERATIONS=10
+OPENLOOP_TRAINING_SESSION_TIME=300
+BASELINE_ITERATIONS=0
+BASELINE_SESSION_TIME=300
 
 # Parse command-line arguments
 while [[ "$#" -gt 0 ]]; do
     case $1 in
+        --iterations) ITERATIONS="$2"; shift ;;
+        --training-trials-per-iteration) TRAINING_TRIALS_PER_ITERATION="$2"; shift ;;
+        --probing-trials-per-iteration) PROBING_TRIALS_PER_ITERATION="$2"; shift ;;
+        --training-session-time) TRAINING_SESSION_TIME="$2"; shift ;;
+        --probing-session-time) PROBING_SESSION_TIME="$2"; shift ;;
+        --inter-session-time) INTER_SESSION_TIME="$2"; shift ;;
         --baseline-session-time) BASELINE_SESSION_TIME="$2"; shift ;;
         --baseline-iterations) BASELINE_ITERATIONS="$2"; shift ;;
-        --training-session-time) TRAINING_SESSION_TIME="$2"; shift ;;
-        --training-iterations) TRAINING_ITERATIONS="$2"; shift ;;
-        --probing-session-time) PROBING_SESSION_TIME="$2"; shift ;;
-        --probing-iterations) PROBING_ITERATIONS="$2"; shift ;;
-        --inter-session-time) INTER_SESSION_TIME="$2"; shift ;;
         --openloop-training-session-time) OPENLOOP_TRAINING_SESSION_TIME="$2"; shift ;;
         --openloop-training-iterations) OPENLOOP_TRAINING_ITERATIONS="$2"; shift ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
@@ -176,10 +178,14 @@ if (( BASELINE_SESSION_TIME > 0 )); then
     done
 fi
 
-# ----------------- TRAINING ITERATIONS -----------------
-for ((i=1; i<=TRAINING_ITERATIONS; i++)); do
-    if (( TRAINING_SESSION_TIME > 0 )); then
-        echo "Starting training iteration $i of $TRAINING_ITERATIONS" | tee -a "$SCRIPT_LOG"
+# ----------------- MAIN ITERATIONS (training + probing per iteration) -----------------
+for ((iter=1; iter<=ITERATIONS; iter++)); do
+    echo "========== Iteration $iter of $ITERATIONS ==========" | tee -a "$SCRIPT_LOG"
+
+    # ---- Training trials in this iteration ----
+    for ((t=1; t<=TRAINING_TRIALS_PER_ITERATION; t++)); do
+        if (( TRAINING_SESSION_TIME <= 0 )); then continue; fi
+        echo "--- Iteration $iter: Training trial $t of $TRAINING_TRIALS_PER_ITERATION ---" | tee -a "$SCRIPT_LOG"
         activate_conda
 
         echo "Running calc_path.py..." | tee -a "$SCRIPT_LOG"
@@ -200,15 +206,14 @@ for ((i=1; i<=TRAINING_ITERATIONS; i++)); do
 
         countdown "$TRAINING_SESSION_TIME"
         stop_processes
-        echo "Waiting for $INTER_SESSION_TIME seconds before next session..." | tee -a "$SCRIPT_LOG"
+        echo "Waiting for $INTER_SESSION_TIME seconds before next trial..." | tee -a "$SCRIPT_LOG"
         countdown "$INTER_SESSION_TIME"
-    fi
-done
+    done
 
-# ----------------- PROBING ITERATIONS -----------------
-for ((i=1; i<=PROBING_ITERATIONS; i++)); do
-    if (( PROBING_SESSION_TIME > 0 )); then
-        echo "Starting probing iteration $i of $PROBING_ITERATIONS" | tee -a "$SCRIPT_LOG"
+    # ---- Probing trials in this iteration ----
+    for ((p=1; p<=PROBING_TRIALS_PER_ITERATION; p++)); do
+        if (( PROBING_SESSION_TIME <= 0 )); then continue; fi
+        echo "--- Iteration $iter: Probing trial $p of $PROBING_TRIALS_PER_ITERATION ---" | tee -a "$SCRIPT_LOG"
         activate_conda
 
         echo "Running calc_path.py..." | tee -a "$SCRIPT_LOG"
@@ -229,9 +234,9 @@ for ((i=1; i<=PROBING_ITERATIONS; i++)); do
 
         countdown "$PROBING_SESSION_TIME"
         stop_processes
-        echo "Waiting for $INTER_SESSION_TIME seconds before next session..." | tee -a "$SCRIPT_LOG"
+        echo "Waiting for $INTER_SESSION_TIME seconds before next trial..." | tee -a "$SCRIPT_LOG"
         countdown "$INTER_SESSION_TIME"
-    fi
+    done
 done
 
 echo "All iterations completed." | tee -a "$SCRIPT_LOG"
