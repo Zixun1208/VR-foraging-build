@@ -1,5 +1,6 @@
 import numpy as np
 import socket
+import time as _time
 from numba import jit
 
 # UDP socket setup
@@ -8,64 +9,73 @@ recv_socket.bind(("127.0.0.1", 1317))  # Listen here
 send_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 send_addr = ("127.0.0.1", 1318)  # Send updated position here
 
-# JIT-optimized function to convert local movement to global dx, dz without inverting signs
+# JIT-optimized function to convert local movement to global dx, dz
 @jit(nopython=True)
 def calculate_dx_dz(ds, df, r, ds_gain, df_gain):
-    # Apply movement gains without sign inversion
-    local_x = ds_gain * ds   # sidestep movement → X
-    local_z = df_gain * df   # forward movement → Z
-
-    # Rotate local movement into the global frame using the heading angle r
+    local_x = ds_gain * ds
+    local_z = df_gain * df
     cos_r = np.cos(r)
     sin_r = np.sin(r)
-
     dx = local_x * cos_r - local_z * sin_r
     dz = local_x * sin_r + local_z * cos_r
-
     return dx, dz
 
-# Initialize position and rotation
-x, z = 0.0, 0.0
-r = 0.0  # Heading angle in radians
+# Initial position and heading
+x, z, r = 0.0, 0.0, 0.0
 
-# Gain parameters
-gain_ds = 4.0
-gain_df = 4.0
+# Gains
+gain_ds = 1.0
+gain_df = 1.0
 gain_dr = 1.0
 gain_dx = 0.0
-gain_dz = 1.0
+gain_dz = 3.9
+gain_r = 0.0
+
+# Send initial position for several seconds so Unity (starts later) receives 0,0,0
+init_z = 0.01
+recv_socket.settimeout(0.02)
+t0 = _time.monotonic()
+while _time.monotonic() - t0 < 3.0:
+    try:
+        recv_socket.recvfrom(1024)
+    except socket.timeout:
+        pass
+    send_socket.sendto(f"{init_z:.1f},{x:.1f},{r:.1f}".encode(), send_addr)
+    _time.sleep(1 / 60.0)
+recv_socket.settimeout(None)
+z = init_z
 
 # Main loop
 while True:
-    # Receive data
     data, addr = recv_socket.recvfrom(1024)
     try:
-        parsed_data = str(data).split(',')
+        parsed_data = data.decode().strip().split(',')
         ds = float(parsed_data[6])
         df = float(parsed_data[7])
         dr = float(parsed_data[8])
     except (ValueError, IndexError):
-        continue  # Skip invalid packets
+        continue
 
-    # Update rotation
-    r += gain_dr * dr
+    # Update step rotation angle
+    r_step = gain_dr * dr
+    # Update r
+    r = gain_r * r_step + r
 
-    # Calculate dx, dz using the updated heading r
+    # Transform movement 
     dx, dz = calculate_dx_dz(ds, df, r, gain_ds, gain_df)
+    # dx, dz = calculate_dx_dz(ds, df, r_step, gain_ds, gain_df)
 
-    # Update x freely
-    x = x + gain_dx * dx
-
-    # Update z with clamping
+    # Update z with clamp
     new_z = z + gain_dz * dz
-    if new_z > 100:
+    if new_z > 99.9:
         z = 99.9
-    elif new_z < 0:
+    elif new_z < 0.01:
         z = 0.01
     else:
         z = new_z
 
-    # Send updated position and heading as CSV (z, x, Radians)
+    # Send result
     send_data = f"{z:.1f},{x:.1f},{r:.1f}".encode()
+    print(send_data.decode())  # Print output for logging
     send_socket.sendto(send_data, send_addr)
 

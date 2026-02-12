@@ -1,5 +1,6 @@
 import numpy as np
 import socket
+import time
 from numba import jit
 
 # UDP socket setup
@@ -28,6 +29,19 @@ r = 0.0
 gain_ds = 2.0
 gain_df = 2.0
 gain_dr = 1.0
+
+# Send initial position for several seconds so Unity (starts later) receives 0,0,0
+recv_socket.settimeout(0.02)
+t0 = time.monotonic()
+while time.monotonic() - t0 < 3.0:
+    try:
+        recv_socket.recvfrom(1024)
+    except socket.timeout:
+        pass
+    send_socket.sendto(f"{x:.1f},{y:.1f},{r:.1f}".encode(), send_addr)
+    time.sleep(1 / 60.0)
+recv_socket.settimeout(None)
+
 # Main loop
 while True:
     # Receive data
