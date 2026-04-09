@@ -11,6 +11,11 @@ OPENLOOP_TRAINING_ITERATIONS=10
 OPENLOOP_TRAINING_SESSION_TIME=300
 BASELINE_ITERATIONS=0
 BASELINE_SESSION_TIME=300
+PATH_LENGTH=100
+OPENLOOP_ZONES="0:150,1:300"
+BASELINE_ZONES="0:none,1:none"
+TRAINING_ZONES="0:100,1:20"
+PROBING_ZONES="0:none,1:none"
 
 # Parse command-line arguments
 while [[ "$#" -gt 0 ]]; do
@@ -25,6 +30,11 @@ while [[ "$#" -gt 0 ]]; do
         --openloop-training-iterations) OPENLOOP_TRAINING_ITERATIONS="$2"; shift ;;
         --training-session-time) TRAINING_SESSION_TIME="$2"; shift ;;
         --probing-session-time) PROBING_SESSION_TIME="$2"; shift ;;
+        --path-length) PATH_LENGTH="$2"; shift ;;
+        --openloop-zones) OPENLOOP_ZONES="$2"; shift ;;
+        --baseline-zones) BASELINE_ZONES="$2"; shift ;;
+        --training-zones) TRAINING_ZONES="$2"; shift ;;
+        --probing-zones) PROBING_ZONES="$2"; shift ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
@@ -171,7 +181,7 @@ if (( OPENLOOP_TRAINING_SESSION_TIME > 0 )); then
         PIDS+=($!)
         
         echo "Running con_led.py..." | tee -a "$SCRIPT_LOG"
-        python3 "$con_led_exe" --zones "0:150,1:300" \
+        python3 "$con_led_exe" --zones "$OPENLOOP_ZONES" \
             --csv-output "$FLASH_CSV_DIR/openloop_training_iter_${i}_${ITER_TIMESTAMP}.csv" \
             >> "$OL_LOG_DIR/con_led_${ITER_TIMESTAMP}.log" 2>&1 &
         PIDS+=($!)
@@ -198,11 +208,11 @@ if (( BASELINE_SESSION_TIME > 0 )); then
         ITER_TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 
         echo "Running calc_path.py..." | tee -a "$SCRIPT_LOG"
-        python3 "$calc_path_exe" >> "$BL_LOG_DIR/calc_path_${ITER_TIMESTAMP}.log" 2>&1 &
+        python3 "$calc_path_exe" --path-length "$PATH_LENGTH" >> "$BL_LOG_DIR/calc_path_${ITER_TIMESTAMP}.log" 2>&1 &
         PIDS+=($!)
 
         echo "Running con_led.py..." | tee -a "$SCRIPT_LOG"
-        python3 "$con_led_exe" --zones "0:none,1:none" \
+        python3 "$con_led_exe" --zones "$BASELINE_ZONES" \
             --csv-output "$FLASH_CSV_DIR/baseline_iter_${i}_${ITER_TIMESTAMP}.csv" \
             >> "$BL_LOG_DIR/con_led_${ITER_TIMESTAMP}.log" 2>&1 &
         PIDS+=($!)
@@ -236,11 +246,11 @@ for ((iter=1; iter<=ITERATIONS; iter++)); do
         ITER_TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 
         echo "Running calc_path.py..." | tee -a "$SCRIPT_LOG"
-        python3 "$calc_path_exe" >> "$TR_LOG_DIR/calc_path_${ITER_TIMESTAMP}.log" 2>&1 &
+        python3 "$calc_path_exe" --path-length "$PATH_LENGTH" >> "$TR_LOG_DIR/calc_path_${ITER_TIMESTAMP}.log" 2>&1 &
         PIDS+=($!)
 
         echo "Running con_led.py..." | tee -a "$SCRIPT_LOG"
-        python3 "$con_led_exe" --zones "0:100,1:20" \
+        python3 "$con_led_exe" --zones "$TRAINING_ZONES" \
             --csv-output "$FLASH_CSV_DIR/training_iter_${iter}_trial_${t}_${ITER_TIMESTAMP}.csv" \
             >> "$TR_LOG_DIR/con_led_${ITER_TIMESTAMP}.log" 2>&1 &
         PIDS+=($!)
@@ -271,11 +281,11 @@ for ((iter=1; iter<=ITERATIONS; iter++)); do
         ITER_TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 
         echo "Running calc_path.py..." | tee -a "$SCRIPT_LOG"
-        python3 "$calc_path_exe" >> "$PR_LOG_DIR/calc_path_${ITER_TIMESTAMP}.log" 2>&1 &
+        python3 "$calc_path_exe" --path-length "$PATH_LENGTH" >> "$PR_LOG_DIR/calc_path_${ITER_TIMESTAMP}.log" 2>&1 &
         PIDS+=($!)
 
         echo "Running con_led.py..." | tee -a "$SCRIPT_LOG"
-        python3 "$con_led_exe" --zones "0:none,1:none" \
+        python3 "$con_led_exe" --zones "$PROBING_ZONES" \
             --csv-output "$FLASH_CSV_DIR/probing_iter_${iter}_trial_${p}_${ITER_TIMESTAMP}.csv" \
             >> "$PR_LOG_DIR/con_led_${ITER_TIMESTAMP}.log" 2>&1 &
         PIDS+=($!)

@@ -1,7 +1,18 @@
 import numpy as np
 import socket
 import time as _time
+import argparse
 from numba import jit
+
+# Args
+parser = argparse.ArgumentParser(description="Integrate FicTrac motion and stream pose to Unity over UDP.")
+parser.add_argument(
+    "--path-length",
+    type=float,
+    default=100.0,
+    help="Virtual corridor length in z units. z wraps forward at z0+path_length. Use <=0 to disable wrapping.",
+)
+args = parser.parse_args()
 
 # UDP socket setup
 recv_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -32,7 +43,9 @@ gain_dz = 3.9
 gain_r = 0.0
 
 # Send initial position for several seconds so Unity (starts later) receives 0,0,0
-init_z = 0.01
+z0 = 0.01
+path_length = float(args.path_length)
+init_z = z0
 recv_socket.settimeout(0.02)
 t0 = _time.monotonic()
 while _time.monotonic() - t0 < 3.0:
@@ -64,12 +77,15 @@ while True:
     # Transform movement
     dx, dz = calculate_dx_dz(ds, df, r, gain_ds, gain_df)
 
-    # Update z (floor only; no upper stop — trials end on session time, not path end)
+    # Update z (floor only; wrap forward at end of corridor)
     new_z = z + gain_dz * dz
-    if new_z < 0.01:
-        z = 0.01
+    if new_z < z0:
+        z = z0
     else:
-        z = new_z
+        if path_length > 0:
+            z = z0 + ((new_z - z0) % path_length)
+        else:
+            z = new_z
 
     # Send result
     send_data = f"{z:.1f},{x:.1f},{r:.1f}".encode()

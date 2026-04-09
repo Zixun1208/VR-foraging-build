@@ -30,7 +30,12 @@ paths = {
     "training_session_time": "300",
     "probing_session_time": "300",
     "training_trials_per_iteration": "1",
-    "probing_trials_per_iteration": "1"
+    "probing_trials_per_iteration": "1",
+    "path_length": "100",
+    "openloop_zones": "0:150,1:300",
+    "baseline_zones": "0:none,1:none",
+    "training_zones": "0:100,1:20",
+    "probing_zones": "0:none,1:none"
 }
 
 # Setup dark style
@@ -67,6 +72,11 @@ def load_config():
         probing_trials_per_iter_var.set(saved.get("probing_trials_per_iteration", "1"))
         openloop_training_time_var.set(saved.get("openloop_training_time", "0"))
         openloop_training_iterations_var.set(saved.get("openloop_training_iterations", "0"))
+        path_length_var.set(saved.get("path_length", "100"))
+        openloop_zones_var.set(saved.get("openloop_zones", "0:150,1:300"))
+        baseline_zones_var.set(saved.get("baseline_zones", "0:none,1:none"))
+        training_zones_var.set(saved.get("training_zones", "0:100,1:20"))
+        probing_zones_var.set(saved.get("probing_zones", "0:none,1:none"))
 
 def save_config():
     for key in entry_vars:
@@ -81,6 +91,11 @@ def save_config():
     paths["probing_trials_per_iteration"] = probing_trials_per_iter_var.get()
     paths["openloop_training_time"] = openloop_training_time_var.get()
     paths["openloop_training_iterations"] = openloop_training_iterations_var.get()
+    paths["path_length"] = path_length_var.get()
+    paths["openloop_zones"] = openloop_zones_var.get()
+    paths["baseline_zones"] = baseline_zones_var.get()
+    paths["training_zones"] = training_zones_var.get()
+    paths["probing_zones"] = probing_zones_var.get()
     with open(CONFIG_FILE, "w") as f:
         json.dump(paths, f, indent=2)
     messagebox.showinfo("Saved", "Default paths saved!")
@@ -125,6 +140,11 @@ training_session_time_var = tk.StringVar()
 probing_session_time_var = tk.StringVar()
 openloop_training_time_var = tk.StringVar()
 openloop_training_iterations_var = tk.StringVar()
+path_length_var = tk.StringVar()
+openloop_zones_var = tk.StringVar()
+baseline_zones_var = tk.StringVar()
+training_zones_var = tk.StringVar()
+probing_zones_var = tk.StringVar()
 
 add_param("Openloop Training Session Time (s):", openloop_training_time_var, "0")
 add_param("Openloop Training Iterations:", openloop_training_iterations_var, "0")
@@ -136,6 +156,11 @@ add_param("Probing session time (s):", probing_session_time_var, "300")
 add_param("Training trials per iteration:", training_trials_per_iter_var, "1")
 add_param("Probing trials per iteration:", probing_trials_per_iter_var, "1")
 add_param("Inter-session Time (s):", inter_time_var, "60")
+add_param("Path length (z units):", path_length_var, "100")
+add_param("Openloop zones (zone:decay,...):", openloop_zones_var, "0:150,1:300")
+add_param("Baseline zones (zone:decay,...):", baseline_zones_var, "0:none,1:none")
+add_param("Training zones (zone:decay,...):", training_zones_var, "0:100,1:20")
+add_param("Probing zones (zone:decay,...):", probing_zones_var, "0:none,1:none")
 
 # Buttons
 start_button = Button(root, text="Start Experiment", bootstyle=SUCCESS)
@@ -163,6 +188,11 @@ def run_experiment():
     openloop_training_iterations = openloop_training_iterations_var.get()
     training_session_time = training_session_time_var.get()
     probing_session_time = probing_session_time_var.get()
+    path_length = path_length_var.get()
+    openloop_zones = openloop_zones_var.get()
+    baseline_zones = baseline_zones_var.get()
+    training_zones = training_zones_var.get()
+    probing_zones = probing_zones_var.get()
 
     if not os.path.isfile(paths["bash_script"]):
         messagebox.showerror("Error", f"Bash script not found: {paths['bash_script']}")
@@ -191,7 +221,12 @@ def run_experiment():
         "--openloop-training-session-time", openloop_training_time,
         "--openloop-training-iterations", openloop_training_iterations,
         "--training-session-time", training_session_time,
-        "--probing-session-time", probing_session_time
+        "--probing-session-time", probing_session_time,
+        "--path-length", path_length,
+        "--openloop-zones", openloop_zones,
+        "--baseline-zones", baseline_zones,
+        "--training-zones", training_zones,
+        "--probing-zones", probing_zones
     ]
 
     start_button.config(state="disabled")
