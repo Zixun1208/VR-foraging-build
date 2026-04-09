@@ -65,16 +65,9 @@ while True:
     dx, dz = calculate_dx_dz(ds, df, r, gain_ds, gain_df)
     # dx, dz = calculate_dx_dz(ds, df, r_step, gain_ds, gain_df)
 
-    # Update z with clamp
+    # Update z (floor only; no upper stop — trials end on session time, not path end)
     new_z = z + gain_dz * dz
-    if new_z > 99:
-        # Fly reached end of path: send final position and exit so trial terminates
-        z = min(new_z, 99.9)
-        send_data = f"{z:.1f},{x:.1f},{r:.1f}".encode()
-        print(send_data.decode())
-        send_socket.sendto(send_data, send_addr)
-        break
-    elif new_z < 0.01:
+    if new_z < 0.01:
         z = 0.01
     else:
         z = new_z

@@ -5,8 +5,8 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Replace with your actual device/port/line
-DAQ_CHANNEL = "cDAQ1Mod1/port0/line3"
-#DAQ_CHANNEL = "cDAQ1Mod1/port0/line0"
+DAQ_CHANNEL = "cDAQ1Mod3/port0/line0"
+#DAQ_CHANNEL = "cDAQ2Mod1/port0/line0"
 def control_led():
     """
     Continuously prompt the user for input:

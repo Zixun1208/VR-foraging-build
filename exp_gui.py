@@ -1,8 +1,7 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext
-from ttkbootstrap import Style
+from ttkbootstrap import Style, Button
 from ttkbootstrap.constants import *
-from ttkbootstrap.widgets import Button
 import subprocess
 import threading
 import os
@@ -28,6 +27,8 @@ paths = {
     "openloop_training_iterations": "0",
     "baseline_iterations": "0",
     "iterations": "15",
+    "training_session_time": "300",
+    "probing_session_time": "300",
     "training_trials_per_iteration": "1",
     "probing_trials_per_iteration": "1"
 }
@@ -60,6 +61,8 @@ def load_config():
         inter_time_var.set(saved.get("inter_session_time", "60"))
         baseline_iterations_var.set(saved.get("baseline_iterations", "0"))
         iterations_var.set(saved.get("iterations", saved.get("training_iterations", "15")))
+        training_session_time_var.set(saved.get("training_session_time", "300"))
+        probing_session_time_var.set(saved.get("probing_session_time", "300"))
         training_trials_per_iter_var.set(saved.get("training_trials_per_iteration", "1"))
         probing_trials_per_iter_var.set(saved.get("probing_trials_per_iteration", "1"))
         openloop_training_time_var.set(saved.get("openloop_training_time", "0"))
@@ -72,6 +75,8 @@ def save_config():
     paths["inter_session_time"] = inter_time_var.get()
     paths["baseline_iterations"] = baseline_iterations_var.get()
     paths["iterations"] = iterations_var.get()
+    paths["training_session_time"] = training_session_time_var.get()
+    paths["probing_session_time"] = probing_session_time_var.get()
     paths["training_trials_per_iteration"] = training_trials_per_iter_var.get()
     paths["probing_trials_per_iteration"] = probing_trials_per_iter_var.get()
     paths["openloop_training_time"] = openloop_training_time_var.get()
@@ -116,6 +121,8 @@ baseline_iterations_var = tk.StringVar()
 iterations_var = tk.StringVar()
 training_trials_per_iter_var = tk.StringVar()
 probing_trials_per_iter_var = tk.StringVar()
+training_session_time_var = tk.StringVar()
+probing_session_time_var = tk.StringVar()
 openloop_training_time_var = tk.StringVar()
 openloop_training_iterations_var = tk.StringVar()
 
@@ -124,6 +131,8 @@ add_param("Openloop Training Iterations:", openloop_training_iterations_var, "0"
 add_param("Baseline Session Time (s):", baseline_time_var, "300")
 add_param("Baseline Iterations:", baseline_iterations_var, "0")
 add_param("Iterations:", iterations_var, "15")
+add_param("Training session time (s):", training_session_time_var, "300")
+add_param("Probing session time (s):", probing_session_time_var, "300")
 add_param("Training trials per iteration:", training_trials_per_iter_var, "1")
 add_param("Probing trials per iteration:", probing_trials_per_iter_var, "1")
 add_param("Inter-session Time (s):", inter_time_var, "60")
@@ -152,6 +161,8 @@ def run_experiment():
     probing_trials_per_iter = probing_trials_per_iter_var.get()
     openloop_training_time = openloop_training_time_var.get()
     openloop_training_iterations = openloop_training_iterations_var.get()
+    training_session_time = training_session_time_var.get()
+    probing_session_time = probing_session_time_var.get()
 
     if not os.path.isfile(paths["bash_script"]):
         messagebox.showerror("Error", f"Bash script not found: {paths['bash_script']}")
@@ -178,7 +189,9 @@ def run_experiment():
         "--probing-trials-per-iteration", probing_trials_per_iter,
         "--inter-session-time", inter_session_time,
         "--openloop-training-session-time", openloop_training_time,
-        "--openloop-training-iterations", openloop_training_iterations
+        "--openloop-training-iterations", openloop_training_iterations,
+        "--training-session-time", training_session_time,
+        "--probing-session-time", probing_session_time
     ]
 
     start_button.config(state="disabled")
