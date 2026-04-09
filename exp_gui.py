@@ -1,4 +1,5 @@
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import filedialog, messagebox, scrolledtext
 from ttkbootstrap import Style, Button
 from ttkbootstrap.constants import *
@@ -43,6 +44,14 @@ style = Style("darkly")
 root = style.master
 root.title("Foraging Experiment GUI")
 entry_vars = {}
+
+# Use a larger, cleaner default UI font for readability.
+UI_FONT = ("Noto Sans", 12)
+LOG_FONT = ("JetBrains Mono", 11)
+default_font = tkfont.nametofont("TkDefaultFont")
+default_font.configure(family=UI_FONT[0], size=UI_FONT[1])
+root.option_add("*Font", default_font)
+style.configure("TButton", font=UI_FONT)
 
 def browse_path(key, is_dir=False):
     path = (
@@ -115,19 +124,19 @@ file_fields = [
 
 row = 0
 for label, key, is_dir in file_fields:
-    tk.Label(root, text=f"{label}:", font=("Segoe UI", 10)).grid(row=row, column=0, sticky="e", padx=5, pady=2)
+    tk.Label(root, text=f"{label}:", font=UI_FONT).grid(row=row, column=0, sticky="e", padx=5, pady=2)
     var = tk.StringVar()
     entry_vars[key] = var
-    tk.Entry(root, textvariable=var, width=60, font=("Segoe UI", 10)).grid(row=row, column=1, padx=5, pady=2)
+    tk.Entry(root, textvariable=var, width=60, font=UI_FONT).grid(row=row, column=1, padx=5, pady=2)
     Button(root, text="Browse", command=lambda k=key, d=is_dir: browse_path(k, d)).grid(row=row, column=2, padx=5)
     row += 1
 
 # Time/iteration parameters
 def add_param(label, var, default):
     global row
-    tk.Label(root, text=label, font=("Segoe UI", 10)).grid(row=row, column=0, sticky="e", padx=5, pady=2)
+    tk.Label(root, text=label, font=UI_FONT).grid(row=row, column=0, sticky="e", padx=5, pady=2)
     var.set(default)
-    tk.Entry(root, textvariable=var, font=("Segoe UI", 10)).grid(row=row, column=1, padx=5)
+    tk.Entry(root, textvariable=var, font=UI_FONT).grid(row=row, column=1, padx=5)
     row += 1
 
 baseline_time_var = tk.StringVar()
@@ -173,7 +182,7 @@ stop_button.grid(row=row, column=2, pady=10)
 row += 1
 
 # Log output
-log_output = scrolledtext.ScrolledText(root, width=100, height=25, font=("Consolas", 10))
+log_output = scrolledtext.ScrolledText(root, width=100, height=25, font=LOG_FONT)
 log_output.grid(row=row, column=0, columnspan=3, padx=10, pady=10)
 
 def run_experiment():
