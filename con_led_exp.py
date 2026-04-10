@@ -13,7 +13,7 @@ from math import log, exp
 FLASH_FREQUENCY = 50.0  # Initial Hz
 FLASH_ON_DURATION_SEC = 0.01
 MIN_LOW_DURATION_SEC = 0.01
-DAQ_CHANNEL = "cDAQ1Mod3/port0/line1"
+DAQ_CHANNEL = "cDAQ1Mod2/port0/line0"
 UDP_IP = "127.0.0.1"
 UDP_PORT = 1319
 FRAME_RATE = 100.0  # Frames per second used to convert frame_count to seconds
