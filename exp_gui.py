@@ -43,7 +43,9 @@ paths: dict[str, str] = {
     "max_amplitude_volts": "5.0",
     "min_amplitude_volts": "0.2",
     "flash_frequency_hz": "50.0",
+    "decay_mode": "exp",
     "loop_sequence": "1",
+    "trial_start_z": "",
 }
 
 FILE_FIELDS: list[tuple[str, str, bool]] = [
@@ -73,7 +75,9 @@ PARAM_FIELDS: list[tuple[str, str]] = [
     ("Max amplitude (V):", "max_amplitude_volts"),
     ("Min amplitude (V):", "min_amplitude_volts"),
     ("Flash frequency (Hz):", "flash_frequency_hz"),
+    ("Decay mode (exp|linear):", "decay_mode"),
     ("Loop sequence (1=yes,0=no):", "loop_sequence"),
+    ("Trial start z (blank=default):", "trial_start_z"),
 ]
 
 field_inputs: dict[str, ui.input] = {}
@@ -275,7 +279,19 @@ def main_page() -> None:
         max_amplitude_volts = paths["max_amplitude_volts"]
         min_amplitude_volts = paths["min_amplitude_volts"]
         flash_frequency_hz = paths["flash_frequency_hz"]
+        decay_mode = paths["decay_mode"].strip().lower()
         loop_sequence = paths["loop_sequence"]
+        trial_start_z = paths["trial_start_z"].strip()
+
+        if decay_mode not in {"exp", "linear"}:
+            ui.notify("Decay mode must be 'exp' or 'linear'.", type="negative")
+            return
+        if trial_start_z:
+            try:
+                float(trial_start_z)
+            except ValueError:
+                ui.notify("Trial start z must be numeric or blank.", type="negative")
+                return
 
         if not os.path.isfile(paths["bash_script"]):
             ui.notify(f"Bash script not found: {paths['bash_script']}", type="negative")
@@ -326,9 +342,13 @@ def main_page() -> None:
             min_amplitude_volts,
             "--flash-frequency-hz",
             flash_frequency_hz,
+            "--decay-mode",
+            decay_mode,
             "--loop-sequence",
             loop_sequence,
         ]
+        if trial_start_z:
+            command.extend(["--trial-start-z", trial_start_z])
 
         start_btn.disable()
         stop_btn.enable()
