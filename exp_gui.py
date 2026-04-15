@@ -1,8 +1,7 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext
-from ttkbootstrap import Style
+from ttkbootstrap import Button, Style
 from ttkbootstrap.constants import *
-from ttkbootstrap.widgets import Button
 import subprocess
 import sys
 import threading
