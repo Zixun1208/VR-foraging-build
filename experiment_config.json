@@ -14,7 +14,7 @@
   "inter_session_time": "10",
   "openloop_training_iterations": "0",
   "baseline_iterations": "3",
-  "total_iterations": "15",
+  "total_iterations": "10",
   "training_trials": "5",
   "probing_trials": "1"
 }
