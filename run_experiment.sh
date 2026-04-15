@@ -66,6 +66,7 @@ TRAINING_CSV_DIR="$RAW_CSV_MAIN_DIR/${TIMESTAMP}/training"
 PROBING_CSV_DIR="$RAW_CSV_MAIN_DIR/${TIMESTAMP}/probing"
 OPENLOOP_TRAINING_CSV_DIR="$RAW_CSV_MAIN_DIR/${TIMESTAMP}/openloop_training"
 FLASH_CSV_DIR="$RAW_CSV_MAIN_DIR/${TIMESTAMP}/flash_events"
+UNITY_CSV_DIR="$RAW_CSV_MAIN_DIR/${TIMESTAMP}/unity"
 
 LOG_BASELINE_DIR="$LOG_DIR/baseline"
 LOG_TRAINING_DIR="$LOG_DIR/training"
@@ -75,7 +76,8 @@ LOG_CONTINUOUS_DIR="$LOG_DIR/continuous"
 
 mkdir -p "$WORKING_DIR" "$FICTRAC_WORKING_DIR" \
          "$LOG_BASELINE_DIR" "$LOG_TRAINING_DIR" "$LOG_PROBING_DIR" "$LOG_OPENLOOP_TRAINING_DIR" "$LOG_CONTINUOUS_DIR" \
-         "$BASELINE_CSV_DIR" "$TRAINING_CSV_DIR" "$PROBING_CSV_DIR" "$OPENLOOP_TRAINING_CSV_DIR" "$FLASH_CSV_DIR"
+         "$BASELINE_CSV_DIR" "$TRAINING_CSV_DIR" "$PROBING_CSV_DIR" "$OPENLOOP_TRAINING_CSV_DIR" "$FLASH_CSV_DIR" \
+         "$UNITY_CSV_DIR"
 
 for ((i=1; i<=OPENLOOP_TRAINING_ITERATIONS; i++)); do mkdir -p "$LOG_OPENLOOP_TRAINING_DIR/iter_${i}"; done
 for ((i=1; i<=BASELINE_ITERATIONS; i++)); do mkdir -p "$LOG_BASELINE_DIR/iter_${i}"; done
@@ -130,13 +132,7 @@ fi
 PIDS+=($!)
 
 cd "$WORKING_DIR" || exit 1
-calc_path_cmd=(python3 "$calc_path_exe" --path-length "$PATH_LENGTH")
-if [[ -n "$TRIAL_START_Z" ]]; then
-    calc_path_cmd+=(--trial-start-z "$TRIAL_START_Z")
-fi
-"${calc_path_cmd[@]}" > >(tee -a "$LOG_CONTINUOUS_DIR/calc_path_${ITER_TIMESTAMP}.log") 2>&1 &
-PIDS+=($!)
-
+# Coordinator before calc_path: calc_path waits for trial metadata on UDP 1322.
 # Tee coordinator stdout so iteration/trial state appears in the experiment driver log (e.g. NiceGUI).
 # Coordinator exits after the last trial; we wait on it so the driver tears down Unity and other children.
 python3 "$coordinator_exe" \
@@ -150,10 +146,23 @@ python3 "$coordinator_exe" \
     --training-zones "$TRAINING_ZONES" \
     --probing-zones "$PROBING_ZONES" \
     --flash-csv-dir "$FLASH_CSV_DIR" \
+    --training-csv-dir "$TRAINING_CSV_DIR" \
+    --probing-csv-dir "$PROBING_CSV_DIR" \
+    --baseline-csv-dir "$BASELINE_CSV_DIR" \
+    --openloop-csv-dir "$OPENLOOP_TRAINING_CSV_DIR" \
     --log-file "$LOG_CONTINUOUS_DIR/trial_coordinator_${ITER_TIMESTAMP}.log" \
     > >(tee -a "$LOG_CONTINUOUS_DIR/trial_coordinator_stdout_${ITER_TIMESTAMP}.log") 2>&1 &
 COORDINATOR_PID=$!
 PIDS+=($COORDINATOR_PID)
+
+sleep 0.1
+
+calc_path_cmd=(python3 "$calc_path_exe" --path-length "$PATH_LENGTH")
+if [[ -n "$TRIAL_START_Z" ]]; then
+    calc_path_cmd+=(--trial-start-z "$TRIAL_START_Z")
+fi
+"${calc_path_cmd[@]}" > >(tee -a "$LOG_CONTINUOUS_DIR/calc_path_${ITER_TIMESTAMP}.log") 2>&1 &
+PIDS+=($!)
 
 python3 "$con_led_exe" \
     --zones "$TRAINING_ZONES" \
@@ -168,7 +177,7 @@ python3 "$con_led_exe" \
     >> "$LOG_CONTINUOUS_DIR/con_led_${ITER_TIMESTAMP}.log" 2>&1 &
 PIDS+=($!)
 
-"$UNITY_EXE" --csvDirectory "$TRAINING_CSV_DIR" >> "$LOG_CONTINUOUS_DIR/unity_${ITER_TIMESTAMP}.log" 2>&1 &
+"$UNITY_EXE" --csvDirectory "$UNITY_CSV_DIR" >> "$LOG_CONTINUOUS_DIR/unity_${ITER_TIMESTAMP}.log" 2>&1 &
 UNITY_PID=$!
 PIDS+=($UNITY_PID)
 

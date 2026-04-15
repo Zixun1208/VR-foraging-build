@@ -8,6 +8,8 @@ import time
 UDP_IP = "127.0.0.1"
 BOUNDARY_PORT = 1321
 TRIAL_META_PORT = 1320
+# Second copy of trial metadata for calc_path.py (only one process may bind a UDP port).
+CALC_PATH_TRIAL_META_PORT = 1322
 
 
 def parse_args():
@@ -24,6 +26,10 @@ def parse_args():
     parser.add_argument("--training-zones", type=str, default="0:100,1:20")
     parser.add_argument("--probing-zones", type=str, default="0:none,1:none")
     parser.add_argument("--flash-csv-dir", type=str, required=True)
+    parser.add_argument("--training-csv-dir", type=str, required=True)
+    parser.add_argument("--probing-csv-dir", type=str, required=True)
+    parser.add_argument("--baseline-csv-dir", type=str, default="")
+    parser.add_argument("--openloop-csv-dir", type=str, default="")
     parser.add_argument("--log-file", type=str, default=None)
     parser.add_argument("--meta-interval-sec", type=float, default=0.25)
     return parser.parse_args()
@@ -192,9 +198,35 @@ def format_trial_status(meta, note=""):
     return "[trial] " + ", ".join(parts)
 
 
-def build_metadata(trial_spec, trial_global_index, trial_start_wall_time, teleport_count, flash_csv_dir):
+def trial_progress_note(trial_global_index, teleport_count, initial=False):
+    note = f"global_trial_index={trial_global_index}, teleport_count={teleport_count}"
+    if initial:
+        return f"(initial, {note})"
+    return f"({note})"
+
+
+def _path_csv_output_for_trial(trial_spec, timestamp: str, args) -> str:
+    phase = trial_spec["phase"]
+    flash_name = trial_spec["flash_csv_name"]
+    name = f"{flash_name}_{timestamp}.csv"
+    if phase == "training":
+        base = args.training_csv_dir
+    elif phase == "probing":
+        base = args.probing_csv_dir
+    elif phase == "baseline":
+        base = args.baseline_csv_dir or args.training_csv_dir
+    elif phase == "openloop_training":
+        base = args.openloop_csv_dir or args.training_csv_dir
+    else:
+        base = args.training_csv_dir
+    os.makedirs(base, exist_ok=True)
+    return os.path.join(base, name)
+
+
+def build_metadata(trial_spec, trial_global_index, trial_start_wall_time, teleport_count, flash_csv_dir, args):
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     csv_path = os.path.join(flash_csv_dir, f"{trial_spec['flash_csv_name']}_{timestamp}.csv")
+    path_csv_path = _path_csv_output_for_trial(trial_spec, timestamp, args)
     return {
         "event": "active_trial",
         "phase": trial_spec["phase"],
@@ -205,6 +237,7 @@ def build_metadata(trial_spec, trial_global_index, trial_start_wall_time, telepo
         "trial_start_wall_time": trial_start_wall_time,
         "teleport_count": teleport_count,
         "flash_csv_output": csv_path,
+        "path_csv_output": path_csv_path,
     }
 
 
@@ -223,18 +256,29 @@ def main():
 
     send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     send_addr = (UDP_IP, TRIAL_META_PORT)
+    calc_path_meta_addr = (UDP_IP, CALC_PATH_TRIAL_META_PORT)
 
     teleport_count = 0
     trial_start_wall_time = time.time()
     trial_global_index = 1
     spec = schedule.current_spec()
     active_meta = build_metadata(
-        spec, trial_global_index, trial_start_wall_time, teleport_count, args.flash_csv_dir
+        spec, trial_global_index, trial_start_wall_time, teleport_count, args.flash_csv_dir, args
     )
-    last_sent = 0.0
 
     maybe_log(args.log_file, f"Coordinator started; {n_trials} trials scheduled.")
-    maybe_log(args.log_file, format_trial_status(active_meta, note="(initial)"))
+    maybe_log(
+        args.log_file,
+        format_trial_status(
+            active_meta,
+            note=trial_progress_note(trial_global_index, teleport_count, initial=True),
+        ),
+    )
+
+    payload0 = json.dumps(active_meta).encode("utf-8")
+    send_sock.sendto(payload0, send_addr)
+    send_sock.sendto(payload0, calc_path_meta_addr)
+    last_sent = time.time()
 
     finished = False
     while not finished:
@@ -261,9 +305,18 @@ def main():
                 trial_start_wall_time = time.time()
                 spec = schedule.current_spec()
                 active_meta = build_metadata(
-                    spec, trial_global_index, trial_start_wall_time, teleport_count, args.flash_csv_dir
+                    spec, trial_global_index, trial_start_wall_time, teleport_count, args.flash_csv_dir, args
                 )
-                send_sock.sendto(json.dumps(active_meta).encode("utf-8"), send_addr)
+                maybe_log(
+                    args.log_file,
+                    format_trial_status(
+                        active_meta,
+                        note=trial_progress_note(trial_global_index, teleport_count),
+                    ),
+                )
+                payload = json.dumps(active_meta).encode("utf-8")
+                send_sock.sendto(payload, send_addr)
+                send_sock.sendto(payload, calc_path_meta_addr)
                 last_sent = now
         except BlockingIOError:
             pass
@@ -272,7 +325,9 @@ def main():
             break
 
         if (now - last_sent) >= args.meta_interval_sec:
-            send_sock.sendto(json.dumps(active_meta).encode("utf-8"), send_addr)
+            payload = json.dumps(active_meta).encode("utf-8")
+            send_sock.sendto(payload, send_addr)
+            send_sock.sendto(payload, calc_path_meta_addr)
             last_sent = now
 
         time.sleep(0.01)
