@@ -26,48 +26,151 @@ def parse_args():
     parser.add_argument("--flash-csv-dir", type=str, required=True)
     parser.add_argument("--log-file", type=str, default=None)
     parser.add_argument("--meta-interval-sec", type=float, default=0.25)
-    parser.add_argument("--loop-sequence", action="store_true", default=False)
     return parser.parse_args()
 
 
-def build_trial_sequence(args):
-    trials = []
-    for i in range(1, args.openloop_training_iterations + 1):
-        trials.append({
-            "phase": "openloop_training",
-            "iteration": i,
-            "trial": 1,
-            "zones": args.openloop_zones,
-            "flash_csv_name": f"openloop_training_iter_{i}",
-        })
+def main_block_has_trials(args) -> bool:
+    return args.iterations > 0 and (
+        args.training_trials_per_iteration > 0 or args.probing_trials_per_iteration > 0
+    )
 
-    for i in range(1, args.baseline_iterations + 1):
-        trials.append({
-            "phase": "baseline",
-            "iteration": i,
-            "trial": 1,
-            "zones": args.baseline_zones,
-            "flash_csv_name": f"baseline_iter_{i}",
-        })
 
-    for i in range(1, args.iterations + 1):
-        for t in range(1, args.training_trials_per_iteration + 1):
-            trials.append({
+def total_scheduled_trials(args) -> int:
+    n = args.openloop_training_iterations + args.baseline_iterations
+    if main_block_has_trials(args):
+        n += args.iterations * (
+            args.training_trials_per_iteration + args.probing_trials_per_iteration
+        )
+    return n
+
+
+class TrialSchedule:
+    """Explicit schedule: open-loop / baseline iteration counts, then per-iteration training vs probing."""
+
+    __slots__ = ("args", "block", "openloop_i", "baseline_i", "iteration", "in_training", "trial")
+
+    def __init__(self, args):
+        self.args = args
+        self.block = ""
+        self.openloop_i = 1
+        self.baseline_i = 1
+        self.iteration = 1
+        self.in_training = True
+        self.trial = 1
+        if not self._seek_first_trial():
+            raise ValueError("No trials configured. Increase iterations/trials in config.")
+
+    def _seek_first_trial(self) -> bool:
+        if self.args.openloop_training_iterations > 0:
+            self.block = "openloop"
+            self.openloop_i = 1
+            return True
+        return self._enter_baseline_or_main_after_openloop()
+
+    def _enter_baseline_or_main_after_openloop(self) -> bool:
+        if self.args.baseline_iterations > 0:
+            self.block = "baseline"
+            self.baseline_i = 1
+            return True
+        return self._enter_main_or_done()
+
+    def _enter_main_or_done(self) -> bool:
+        if not main_block_has_trials(self.args):
+            return False
+        self.block = "main"
+        self.iteration = 1
+        if self.args.training_trials_per_iteration > 0:
+            self.in_training = True
+            self.trial = 1
+        else:
+            self.in_training = False
+            self.trial = 1
+        return True
+
+    def current_spec(self) -> dict:
+        a = self.args
+        if self.block == "openloop":
+            i = self.openloop_i
+            return {
+                "phase": "openloop_training",
+                "iteration": i,
+                "trial": 1,
+                "zones": a.openloop_zones,
+                "flash_csv_name": f"openloop_training_iter_{i}",
+            }
+        if self.block == "baseline":
+            i = self.baseline_i
+            return {
+                "phase": "baseline",
+                "iteration": i,
+                "trial": 1,
+                "zones": a.baseline_zones,
+                "flash_csv_name": f"baseline_iter_{i}",
+            }
+        it = self.iteration
+        t = self.trial
+        if self.in_training:
+            return {
                 "phase": "training",
-                "iteration": i,
+                "iteration": it,
                 "trial": t,
-                "zones": args.training_zones,
-                "flash_csv_name": f"training_iter_{i}_trial_{t}",
-            })
-        for p in range(1, args.probing_trials_per_iteration + 1):
-            trials.append({
-                "phase": "probing",
-                "iteration": i,
-                "trial": p,
-                "zones": args.probing_zones,
-                "flash_csv_name": f"probing_iter_{i}_trial_{p}",
-            })
-    return trials
+                "zones": a.training_zones,
+                "flash_csv_name": f"training_iter_{it}_trial_{t}",
+            }
+        return {
+            "phase": "probing",
+            "iteration": it,
+            "trial": t,
+            "zones": a.probing_zones,
+            "flash_csv_name": f"probing_iter_{it}_trial_{t}",
+        }
+
+    def advance_after_boundary(self) -> bool:
+        """Advance to the next trial. Returns False if the schedule is finished."""
+        a = self.args
+        if self.block == "openloop":
+            if self.openloop_i < a.openloop_training_iterations:
+                self.openloop_i += 1
+                return True
+            if a.baseline_iterations > 0:
+                self.block = "baseline"
+                self.baseline_i = 1
+                return True
+            return self._enter_main_or_done()
+
+        if self.block == "baseline":
+            if self.baseline_i < a.baseline_iterations:
+                self.baseline_i += 1
+                return True
+            return self._enter_main_or_done()
+
+        if self.in_training:
+            if self.trial < a.training_trials_per_iteration:
+                self.trial += 1
+                return True
+            if a.probing_trials_per_iteration > 0:
+                self.in_training = False
+                self.trial = 1
+                return True
+            return self._advance_main_iteration()
+
+        if self.trial < a.probing_trials_per_iteration:
+            self.trial += 1
+            return True
+        return self._advance_main_iteration()
+
+    def _advance_main_iteration(self) -> bool:
+        a = self.args
+        if self.iteration < a.iterations:
+            self.iteration += 1
+            if a.training_trials_per_iteration > 0:
+                self.in_training = True
+                self.trial = 1
+            else:
+                self.in_training = False
+                self.trial = 1
+            return True
+        return False
 
 
 def maybe_log(log_file, message):
@@ -77,7 +180,7 @@ def maybe_log(log_file, message):
             f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {message}\n")
 
 
-def format_trial_status(meta, cycle=0, note=""):
+def format_trial_status(meta, note=""):
     """Single-line status for human-readable logs (GUI + files)."""
     parts = [
         f"phase={meta['phase']}",
@@ -107,9 +210,8 @@ def build_metadata(trial_spec, trial_global_index, trial_start_wall_time, telepo
 
 def main():
     args = parse_args()
-    trials = build_trial_sequence(args)
-    if not trials:
-        raise ValueError("No trials configured. Increase iterations/trials in config.")
+    schedule = TrialSchedule(args)
+    n_trials = total_scheduled_trials(args)
 
     os.makedirs(args.flash_csv_dir, exist_ok=True)
     if args.log_file:
@@ -122,20 +224,20 @@ def main():
     send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     send_addr = (UDP_IP, TRIAL_META_PORT)
 
-    seq_idx = 0
-    cycle = 0
     teleport_count = 0
     trial_start_wall_time = time.time()
     trial_global_index = 1
+    spec = schedule.current_spec()
     active_meta = build_metadata(
-        trials[seq_idx], trial_global_index, trial_start_wall_time, teleport_count, args.flash_csv_dir
+        spec, trial_global_index, trial_start_wall_time, teleport_count, args.flash_csv_dir
     )
     last_sent = 0.0
 
-    maybe_log(args.log_file, f"Coordinator started with {len(trials)} trial specs.")
-    maybe_log(args.log_file, format_trial_status(active_meta, cycle, note="(initial)"))
+    maybe_log(args.log_file, f"Coordinator started; {n_trials} trials scheduled.")
+    maybe_log(args.log_file, format_trial_status(active_meta, note="(initial)"))
 
-    while True:
+    finished = False
+    while not finished:
         now = time.time()
 
         try:
@@ -146,30 +248,37 @@ def main():
                     continue
 
                 teleport_count = int(event.get("teleport_count", teleport_count + 1))
-                seq_idx += 1
-                if seq_idx >= len(trials):
-                    if args.loop_sequence:
-                        seq_idx = 0
-                        cycle += 1
-                    else:
-                        seq_idx = len(trials) - 1
+                if not schedule.advance_after_boundary():
+                    maybe_log(
+                        args.log_file,
+                        f"Schedule complete after {n_trials} trials "
+                        f"(final teleport_count={teleport_count}); exiting.",
+                    )
+                    finished = True
+                    break
 
                 trial_global_index += 1
                 trial_start_wall_time = time.time()
+                spec = schedule.current_spec()
                 active_meta = build_metadata(
-                    trials[seq_idx], trial_global_index, trial_start_wall_time, teleport_count, args.flash_csv_dir
+                    spec, trial_global_index, trial_start_wall_time, teleport_count, args.flash_csv_dir
                 )
-                active_meta["cycle"] = cycle
                 send_sock.sendto(json.dumps(active_meta).encode("utf-8"), send_addr)
                 last_sent = now
         except BlockingIOError:
             pass
+
+        if finished:
+            break
 
         if (now - last_sent) >= args.meta_interval_sec:
             send_sock.sendto(json.dumps(active_meta).encode("utf-8"), send_addr)
             last_sent = now
 
         time.sleep(0.01)
+
+    recv_sock.close()
+    send_sock.close()
 
 
 if __name__ == "__main__":

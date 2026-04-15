@@ -1,6 +1,6 @@
 {
   "bash_script": "/home/kazama/Experiment_builds/VR-foraging-build/run_experiment.sh",
-  "unity_exe": "/home/kazama/Unity_Builds/foraging-no-interval/foraging-no-interval.x86_64",
+  "unity_exe": "/home/kazama/Unity_builds/foraging-no-interval/foraging-no-interval.x86_64",
   "fictrac_exe": "/home/kazama/fictrac/bin/fictrac",
   "fictrac_config": "/home/kazama/fictrac/fictrac_config/config1.txt",
   "calc_path_py": "/home/kazama/Experiment_builds/VR-foraging-build/calc_path.py",
@@ -19,10 +19,11 @@
   "training_zones": "0:20,1:100",
   "probing_zones": "0:none,1:none",
   "ao_channel": "cDAQ1Mod2/ao0",
-  "max_amplitude_volts": "2.5",
-  "min_amplitude_volts": "0",
-  "flash_frequency_hz": "50.0",
+  "zone0_max_volts": "5",
+  "zone0_min_volts": "4",
+  "zone1_max_volts": "2",
+  "zone1_min_volts": "1",
+  "flash_frequency_hz": "50",
   "decay_mode": "linear",
-  "loop_sequence": "1",
-  "trial_start_z": "30"
+  "trial_start_z": ""
 }

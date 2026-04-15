@@ -11,11 +11,12 @@ BASELINE_ZONES="0:none,1:none"
 TRAINING_ZONES="0:100,1:20"
 PROBING_ZONES="0:none,1:none"
 AO_CHANNEL="cDAQ1Mod2/ao0"
+MAX_AMPLITUDE_VOLTS_BY_ZONE="0:5.0,1:5.0"
+MIN_AMPLITUDE_VOLTS_BY_ZONE="0:0.2,1:0.2"
 MAX_AMPLITUDE_VOLTS=5.0
 MIN_AMPLITUDE_VOLTS=0.2
 FLASH_FREQUENCY_HZ=50.0
 DECAY_MODE="exp"
-LOOP_SEQUENCE=1
 TRIAL_START_Z=""
 USE_FICTRAC_SIM=0
 
@@ -32,11 +33,12 @@ while [[ "$#" -gt 0 ]]; do
         --training-zones) TRAINING_ZONES="$2"; shift ;;
         --probing-zones) PROBING_ZONES="$2"; shift ;;
         --ao-channel) AO_CHANNEL="$2"; shift ;;
+        --max-amplitude-volts-by-zone) MAX_AMPLITUDE_VOLTS_BY_ZONE="$2"; shift ;;
+        --min-amplitude-volts-by-zone) MIN_AMPLITUDE_VOLTS_BY_ZONE="$2"; shift ;;
         --max-amplitude-volts) MAX_AMPLITUDE_VOLTS="$2"; shift ;;
         --min-amplitude-volts) MIN_AMPLITUDE_VOLTS="$2"; shift ;;
         --flash-frequency-hz) FLASH_FREQUENCY_HZ="$2"; shift ;;
         --decay-mode) DECAY_MODE="$2"; shift ;;
-        --loop-sequence) LOOP_SEQUENCE="$2"; shift ;;
         --trial-start-z) TRIAL_START_Z="$2"; shift ;;
         --use-fictrac-sim) USE_FICTRAC_SIM="$2"; shift ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
@@ -136,6 +138,7 @@ fi
 PIDS+=($!)
 
 # Tee coordinator stdout so iteration/trial state appears in the experiment driver log (e.g. NiceGUI).
+# Coordinator exits after the last trial; we wait on it so the driver tears down Unity and other children.
 python3 "$coordinator_exe" \
     --iterations "$ITERATIONS" \
     --training-trials-per-iteration "$TRAINING_TRIALS_PER_ITERATION" \
@@ -148,13 +151,15 @@ python3 "$coordinator_exe" \
     --probing-zones "$PROBING_ZONES" \
     --flash-csv-dir "$FLASH_CSV_DIR" \
     --log-file "$LOG_CONTINUOUS_DIR/trial_coordinator_${ITER_TIMESTAMP}.log" \
-    $([[ "$LOOP_SEQUENCE" == "1" ]] && echo "--loop-sequence") \
     > >(tee -a "$LOG_CONTINUOUS_DIR/trial_coordinator_stdout_${ITER_TIMESTAMP}.log") 2>&1 &
-PIDS+=($!)
+COORDINATOR_PID=$!
+PIDS+=($COORDINATOR_PID)
 
 python3 "$con_led_exe" \
     --zones "$TRAINING_ZONES" \
     --ao-channel "$AO_CHANNEL" \
+    --max-amplitude-volts-by-zone "$MAX_AMPLITUDE_VOLTS_BY_ZONE" \
+    --min-amplitude-volts-by-zone "$MIN_AMPLITUDE_VOLTS_BY_ZONE" \
     --max-amplitude-volts "$MAX_AMPLITUDE_VOLTS" \
     --min-amplitude-volts "$MIN_AMPLITUDE_VOLTS" \
     --flash-frequency-hz "$FLASH_FREQUENCY_HZ" \
@@ -167,6 +172,6 @@ PIDS+=($!)
 UNITY_PID=$!
 PIDS+=($UNITY_PID)
 
-echo "Continuous run active. Trials advance on teleport boundaries." | tee -a "$SCRIPT_LOG"
-wait "$UNITY_PID"
+echo "Continuous run active. Trials advance on teleport boundaries; run ends when all trials complete." | tee -a "$SCRIPT_LOG"
+wait "$COORDINATOR_PID"
 

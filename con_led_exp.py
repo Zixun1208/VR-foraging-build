@@ -19,31 +19,57 @@ UDP_IP = "127.0.0.1"
 UDP_PORT = 1319
 TRIAL_META_PORT = 1320
 
-def parse_zone_decay_rates(zones_str, max_amp, min_amp, decay_mode):
+def parse_zone_volt_map(spec: str) -> dict[int, float]:
+    """Parse '0:5.0,1:3.0' into {0: 5.0, 1: 3.0}. Whitespace around tokens is ignored."""
+    result: dict[int, float] = {}
+    for zone_pair in spec.split(","):
+        zone_pair = zone_pair.strip()
+        if not zone_pair:
+            continue
+        try:
+            zid_s, volt_s = zone_pair.split(":", 1)
+            result[int(zid_s.strip())] = float(volt_s.strip())
+        except ValueError:
+            logging.error("Invalid zone:voltage pair '%s'. Expected e.g. '0:5.0'", zone_pair)
+    return result
+
+
+def parse_zone_decay_rates(zones_str, decay_mode, zone_max_amp, zone_min_amp, default_max, default_min):
     """
     Parses a string of zone:decay_duration pairs (e.g., "0:150,1:none") into a dict.
-    Each value is the time in seconds for amplitude to decay from max_amp to min_amp.
+    Each value is the time in seconds for amplitude to decay from that zone's max to min.
     'none' disables reward output for that zone.
     """
     zone_decay_constants = {}
     for zone_pair in zones_str.split(','):
         try:
             zone, decay_spec = zone_pair.split(':')
+            zid = int(zone)
+            max_amp = zone_max_amp.get(zid, default_max)
+            min_amp = zone_min_amp.get(zid, default_min)
+            if min_amp <= 0.0:
+                raise ValueError(f"min amplitude for zone {zid} must be > 0")
+            if max_amp <= min_amp:
+                raise ValueError(f"max amplitude for zone {zid} must be > min amplitude")
             if decay_spec.lower() == 'none':
-                zone_decay_constants[int(zone)] = None
+                zone_decay_constants[zid] = None
             else:
                 decay_time = float(decay_spec)
                 if decay_time == 0.0:
-                    zone_decay_constants[int(zone)] = 0.0
+                    zone_decay_constants[zid] = 0.0
                 else:
                     if decay_mode == "exp":
                         k = log(max_amp / min_amp) / decay_time
-                        zone_decay_constants[int(zone)] = k
+                        zone_decay_constants[zid] = k
                     else:
                         slope = (max_amp - min_amp) / decay_time
-                        zone_decay_constants[int(zone)] = slope
-        except ValueError:
-            logging.error(f"Invalid format for '{zone_pair}'. Expected 'zone:seconds' or 'zone:none'")
+                        zone_decay_constants[zid] = slope
+        except ValueError as exc:
+            logging.error(
+                "Invalid zone spec '%s': %s. Expected 'zone:seconds' or 'zone:none'",
+                zone_pair,
+                exc,
+            )
     return zone_decay_constants
 
 # Argument parser
@@ -65,8 +91,30 @@ parser.add_argument(
     help="Path to a CSV file where flash-ON events will be recorded. If omitted, no CSV is written."
 )
 parser.add_argument("--ao-channel", type=str, default=DEFAULT_DAQ_AO_CHANNEL, help="DAQ analog output channel.")
-parser.add_argument("--max-amplitude-volts", type=float, default=5.0, help="Pulse amplitude at trial start.")
-parser.add_argument("--min-amplitude-volts", type=float, default=0.2, help="Minimum pulse amplitude after decay.")
+parser.add_argument(
+    "--max-amplitude-volts-by-zone",
+    type=str,
+    default="0:5.0,1:5.0",
+    help="Comma-separated zone:max_V pairs (e.g. '0:5.0,1:3.0'). Per-zone pulse amplitude at decay start.",
+)
+parser.add_argument(
+    "--min-amplitude-volts-by-zone",
+    type=str,
+    default="0:0.2,1:0.2",
+    help="Comma-separated zone:min_V pairs. Per-zone floor during decay.",
+)
+parser.add_argument(
+    "--max-amplitude-volts",
+    type=float,
+    default=5.0,
+    help="Fallback max (V) for zones not listed in --max-amplitude-volts-by-zone; also sets DAQ range.",
+)
+parser.add_argument(
+    "--min-amplitude-volts",
+    type=float,
+    default=0.2,
+    help="Fallback min (V) for zones not listed in --min-amplitude-volts-by-zone.",
+)
 parser.add_argument("--flash-frequency-hz", type=float, default=FLASH_FREQUENCY, help="Fixed pulse frequency.")
 parser.add_argument(
     "--decay-mode",
@@ -77,16 +125,24 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
+zone_max_amp = parse_zone_volt_map(args.max_amplitude_volts_by_zone)
+zone_min_amp = parse_zone_volt_map(args.min_amplitude_volts_by_zone)
 if args.min_amplitude_volts <= 0.0:
     raise ValueError("--min-amplitude-volts must be > 0")
 if args.max_amplitude_volts <= args.min_amplitude_volts:
     raise ValueError("--max-amplitude-volts must be greater than --min-amplitude-volts")
 
+daq_max_volt = args.max_amplitude_volts
+if zone_max_amp:
+    daq_max_volt = max(daq_max_volt, max(zone_max_amp.values()))
+
 default_zone_decay_constants = parse_zone_decay_rates(
     args.zones,
+    args.decay_mode,
+    zone_max_amp,
+    zone_min_amp,
     args.max_amplitude_volts,
     args.min_amplitude_volts,
-    args.decay_mode,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -215,7 +271,7 @@ def udp_daq_control():
         task.ao_channels.add_ao_voltage_chan(
             resolved_ao_channel,
             min_val=0.0,
-            max_val=args.max_amplitude_volts,
+            max_val=daq_max_volt,
         )
         task.start()
         write_zero(task)
@@ -270,9 +326,11 @@ def udp_daq_control():
                             zone_accum_last_zone = None
                             zone_decay_constants = parse_zone_decay_rates(
                                 meta.get("zones", args.zones),
+                                args.decay_mode,
+                                zone_max_amp,
+                                zone_min_amp,
                                 args.max_amplitude_volts,
                                 args.min_amplitude_volts,
-                                args.decay_mode,
                             )
                             output_state, next_flash_time, pulse_end_time, _ = reset_flash_state(current_time)
 
@@ -311,15 +369,17 @@ def udp_daq_control():
                     continue
 
                 elapsed_time_sec = zone_elapsed_time_sec.get(zone, 0.0)
+                z_max = zone_max_amp.get(zone, args.max_amplitude_volts)
+                z_min = zone_min_amp.get(zone, args.min_amplitude_volts)
 
                 if decay_constant == 0.0:
-                    new_amplitude = args.max_amplitude_volts
+                    new_amplitude = z_max
                 else:
                     if args.decay_mode == "exp":
-                        new_amplitude = args.max_amplitude_volts * exp(-decay_constant * elapsed_time_sec)
+                        new_amplitude = z_max * exp(-decay_constant * elapsed_time_sec)
                     else:
-                        new_amplitude = args.max_amplitude_volts - (decay_constant * elapsed_time_sec)
-                    new_amplitude = max(args.min_amplitude_volts, new_amplitude)
+                        new_amplitude = z_max - (decay_constant * elapsed_time_sec)
+                    new_amplitude = max(z_min, new_amplitude)
 
                 if output_state and pulse_end_time is not None and current_time >= pulse_end_time:
                     write_zero(task)

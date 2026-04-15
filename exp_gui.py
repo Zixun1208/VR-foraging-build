@@ -16,7 +16,6 @@ from typing import Any
 from local_file_picker import local_file_picker
 from nicegui import app, ui
 
-CONFIG_FILE = "experiment_config.json"
 process: subprocess.Popen[str] | None = None
 
 paths: dict[str, str] = {
@@ -40,11 +39,12 @@ paths: dict[str, str] = {
     "training_zones": "0:100,1:20",
     "probing_zones": "0:none,1:none",
     "ao_channel": "cDAQ1Mod2/ao0",
-    "max_amplitude_volts": "5.0",
-    "min_amplitude_volts": "0.2",
+    "zone0_max_volts": "5.0",
+    "zone0_min_volts": "0.2",
+    "zone1_max_volts": "5.0",
+    "zone1_min_volts": "0.2",
     "flash_frequency_hz": "50.0",
     "decay_mode": "exp",
-    "loop_sequence": "1",
     "trial_start_z": "",
 }
 
@@ -72,11 +72,12 @@ PARAM_FIELDS: list[tuple[str, str]] = [
     ("Training zones (zone:decay,...):", "training_zones"),
     ("Probing zones (zone:decay,...):", "probing_zones"),
     ("AO channel:", "ao_channel"),
-    ("Max amplitude (V):", "max_amplitude_volts"),
-    ("Min amplitude (V):", "min_amplitude_volts"),
+    ("Zone 0 max amplitude (V):", "zone0_max_volts"),
+    ("Zone 0 min amplitude (V):", "zone0_min_volts"),
+    ("Zone 1 max amplitude (V):", "zone1_max_volts"),
+    ("Zone 1 min amplitude (V):", "zone1_min_volts"),
     ("Flash frequency (Hz):", "flash_frequency_hz"),
     ("Decay mode (exp|linear):", "decay_mode"),
-    ("Loop sequence (1=yes,0=no):", "loop_sequence"),
     ("Trial start z (blank=default):", "trial_start_z"),
 ]
 
@@ -111,26 +112,19 @@ def _sync_paths_from_ui() -> None:
         paths[key] = (inp.value or "").strip()
 
 
-def load_config() -> None:
-    if not os.path.exists(CONFIG_FILE):
-        return
-    with open(CONFIG_FILE, encoding="utf-8") as f:
-        saved: dict[str, Any] = json.load(f)
-    for key in paths:
-        if key in saved:
-            paths[key] = str(saved[key])
-    paths["iterations"] = str(
-        saved.get("iterations", saved.get("training_iterations", paths["iterations"]))
-    )
-    for key, inp in field_inputs.items():
-        inp.value = str(paths.get(key, ""))
+def _default_config_path() -> str:
+    return str(Path(__file__).resolve().parent / "experiment_config.json")
 
 
-def save_config() -> None:
-    _sync_paths_from_ui()
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(paths, f, indent=2)
-    ui.notify("Default paths and parameters saved.", type="positive")
+def resolve_config_path(raw: str) -> str:
+    """Resolve config file path; relative paths are taken from this script's directory."""
+    s = (raw or "").strip()
+    if not s:
+        return _default_config_path()
+    p = Path(s).expanduser()
+    if not p.is_absolute():
+        p = Path(__file__).resolve().parent / p
+    return str(p.resolve())
 
 
 def _picker_start_dir(raw: str) -> Path:
@@ -177,10 +171,75 @@ def main_page() -> None:
 
     ui.label("Foraging Experiment").classes("text-h5 q-mt-sm q-mb-sm")
 
+    def apply_saved_json(saved: dict[str, Any]) -> None:
+        for key in paths:
+            if key in saved:
+                paths[key] = str(saved[key])
+        if "zone0_max_volts" not in saved and "max_amplitude_volts" in saved:
+            m = str(saved["max_amplitude_volts"])
+            paths["zone0_max_volts"] = m
+            paths["zone1_max_volts"] = m
+        if "zone0_min_volts" not in saved and "min_amplitude_volts" in saved:
+            m = str(saved["min_amplitude_volts"])
+            paths["zone0_min_volts"] = m
+            paths["zone1_min_volts"] = m
+        paths["iterations"] = str(
+            saved.get("iterations", saved.get("training_iterations", paths["iterations"]))
+        )
+        for key, inp in field_inputs.items():
+            inp.value = str(paths.get(key, ""))
+
+    def load_config_from_disk(*, silent: bool = False) -> None:
+        path = resolve_config_path(config_path_input.value)
+        config_path_input.value = path
+        if not os.path.isfile(path):
+            if not silent:
+                ui.notify(f"No file at {path}", type="warning")
+            return
+        with open(path, encoding="utf-8") as f:
+            saved: dict[str, Any] = json.load(f)
+        apply_saved_json(saved)
+        if not silent:
+            ui.notify(f"Loaded config from {path}", type="positive")
+
+    def save_config_to_disk() -> None:
+        _sync_paths_from_ui()
+        path = resolve_config_path(config_path_input.value)
+        config_path_input.value = path
+        parent_dir = os.path.dirname(path)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(paths, f, indent=2)
+        ui.notify(f"Saved config to {path}", type="positive")
+
     with ui.splitter(value=58).classes("w-full").style("height: calc(100vh - 120px)") as splitter:
         with splitter.before:
             with ui.scroll_area().classes("w-full h-full"):
                 with ui.column().classes("w-full q-gutter-y-sm q-pa-sm"):
+                    with ui.card().classes("w-full"):
+                        ui.label("Config file").classes("text-subtitle1 text-weight-medium")
+                        with ui.row().classes("w-full items-center no-wrap q-gutter-x-sm"):
+                            ui.label("JSON path").classes("w-48 shrink-0 text-right")
+                            config_path_input = (
+                                ui.input(value=_default_config_path())
+                                .props("dense outlined")
+                                .classes("flex-grow min-w-0")
+                                .tooltip("Relative paths are resolved from the folder containing exp_gui.py")
+                            )
+
+                            async def _browse_config() -> None:
+                                start = _picker_start_dir(config_path_input.value or "")
+                                picker = local_file_picker(str(start), pick_directory=False, upper_limit=None)
+                                result = await picker
+                                if result:
+                                    config_path_input.value = result[0]
+
+                            ui.button("Browse", on_click=_browse_config).props("dense flat")
+                            ui.button("Load", on_click=lambda: load_config_from_disk(silent=False)).props(
+                                "dense flat"
+                            )
+
                     with ui.card().classes("w-full"):
                         ui.label("Paths").classes("text-subtitle1 text-weight-medium")
                         for label, key, is_dir in FILE_FIELDS:
@@ -211,7 +270,7 @@ def main_page() -> None:
 
                     with ui.row().classes("w-full q-gutter-sm q-pb-md"):
                         start_btn = ui.button("Start Experiment", color="positive")
-                        ui.button("Save as Default", color="primary", on_click=save_config)
+                        ui.button("Save config", color="primary", on_click=save_config_to_disk)
                         stop_btn = ui.button("Stop Experiment", color="negative")
                         stop_btn.disable()
                         ui.button("Quit GUI", on_click=app.shutdown).props("outline")
@@ -276,16 +335,35 @@ def main_page() -> None:
         training_zones = paths["training_zones"]
         probing_zones = paths["probing_zones"]
         ao_channel = paths["ao_channel"]
-        max_amplitude_volts = paths["max_amplitude_volts"]
-        min_amplitude_volts = paths["min_amplitude_volts"]
+        z0_max = paths["zone0_max_volts"]
+        z0_min = paths["zone0_min_volts"]
+        z1_max = paths["zone1_max_volts"]
+        z1_min = paths["zone1_min_volts"]
         flash_frequency_hz = paths["flash_frequency_hz"]
         decay_mode = paths["decay_mode"].strip().lower()
-        loop_sequence = paths["loop_sequence"]
         trial_start_z = paths["trial_start_z"].strip()
 
         if decay_mode not in {"exp", "linear"}:
             ui.notify("Decay mode must be 'exp' or 'linear'.", type="negative")
             return
+        try:
+            z0_max_f = float(z0_max)
+            z0_min_f = float(z0_min)
+            z1_max_f = float(z1_max)
+            z1_min_f = float(z1_min)
+        except ValueError:
+            ui.notify("Zone amplitude fields must be numeric.", type="negative")
+            return
+        if z0_min_f <= 0 or z1_min_f <= 0:
+            ui.notify("Zone min amplitude must be greater than 0.", type="negative")
+            return
+        if z0_max_f <= z0_min_f or z1_max_f <= z1_min_f:
+            ui.notify("Each zone max amplitude must be greater than that zone's min.", type="negative")
+            return
+        max_amplitude_volts = str(max(z0_max_f, z1_max_f))
+        min_amplitude_volts = str(min(z0_min_f, z1_min_f))
+        max_amplitude_volts_by_zone = f"0:{z0_max},1:{z1_max}"
+        min_amplitude_volts_by_zone = f"0:{z0_min},1:{z1_min}"
         if trial_start_z:
             try:
                 float(trial_start_z)
@@ -336,6 +414,10 @@ def main_page() -> None:
             probing_zones,
             "--ao-channel",
             ao_channel,
+            "--max-amplitude-volts-by-zone",
+            max_amplitude_volts_by_zone,
+            "--min-amplitude-volts-by-zone",
+            min_amplitude_volts_by_zone,
             "--max-amplitude-volts",
             max_amplitude_volts,
             "--min-amplitude-volts",
@@ -344,8 +426,6 @@ def main_page() -> None:
             flash_frequency_hz,
             "--decay-mode",
             decay_mode,
-            "--loop-sequence",
-            loop_sequence,
         ]
         if trial_start_z:
             command.extend(["--trial-start-z", trial_start_z])
@@ -386,7 +466,7 @@ def main_page() -> None:
     start_btn.on_click(run_experiment)
     stop_btn.on_click(stop_experiment)
 
-    load_config()
+    load_config_from_disk(silent=True)
 
 
 if __name__ in {"__main__", "__mp_main__"}:
