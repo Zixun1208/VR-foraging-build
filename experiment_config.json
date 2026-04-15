@@ -16,7 +16,7 @@
   "path_length": "130",
   "openloop_zones": "0:20,1:140",
   "baseline_zones": "0:none,1:none",
-  "training_zones": "0:0,1:0",
+  "training_zones": "0:20,1:140",
   "probing_zones": "0:none,1:none",
   "ao_channel": "cDAQ1Mod2/ao0",
   "zone0_max_volts": "1",
