@@ -5,7 +5,7 @@ TRAINING_TRIALS_PER_ITERATION=1
 PROBING_TRIALS_PER_ITERATION=1
 OPENLOOP_TRAINING_ITERATIONS=0
 BASELINE_ITERATIONS=0
-PATH_LENGTH=100
+PATH_LENGTH=130
 OPENLOOP_ZONES="0:150,1:300"
 BASELINE_ZONES="0:none,1:none"
 TRAINING_ZONES="0:100,1:20"
@@ -61,10 +61,6 @@ FICTRAC_WORKING_MAIN_DIR="${FICTRAC_WORKING_DIR:-/home/kazama/fictrac/foraging}"
 WORKING_DIR="$WORKING_MAIN_DIR/${TIMESTAMP}"
 FICTRAC_WORKING_DIR="$FICTRAC_WORKING_MAIN_DIR/${TIMESTAMP}"
 LOG_DIR="$WORKING_DIR/logs"
-BASELINE_CSV_DIR="$RAW_CSV_MAIN_DIR/${TIMESTAMP}/baseline"
-TRAINING_CSV_DIR="$RAW_CSV_MAIN_DIR/${TIMESTAMP}/training"
-PROBING_CSV_DIR="$RAW_CSV_MAIN_DIR/${TIMESTAMP}/probing"
-OPENLOOP_TRAINING_CSV_DIR="$RAW_CSV_MAIN_DIR/${TIMESTAMP}/openloop_training"
 FLASH_CSV_DIR="$RAW_CSV_MAIN_DIR/${TIMESTAMP}/flash_events"
 UNITY_CSV_DIR="$RAW_CSV_MAIN_DIR/${TIMESTAMP}/unity"
 
@@ -76,8 +72,7 @@ LOG_CONTINUOUS_DIR="$LOG_DIR/continuous"
 
 mkdir -p "$WORKING_DIR" "$FICTRAC_WORKING_DIR" \
          "$LOG_BASELINE_DIR" "$LOG_TRAINING_DIR" "$LOG_PROBING_DIR" "$LOG_OPENLOOP_TRAINING_DIR" "$LOG_CONTINUOUS_DIR" \
-         "$BASELINE_CSV_DIR" "$TRAINING_CSV_DIR" "$PROBING_CSV_DIR" "$OPENLOOP_TRAINING_CSV_DIR" "$FLASH_CSV_DIR" \
-         "$UNITY_CSV_DIR"
+         "$FLASH_CSV_DIR" "$UNITY_CSV_DIR"
 
 for ((i=1; i<=OPENLOOP_TRAINING_ITERATIONS; i++)); do mkdir -p "$LOG_OPENLOOP_TRAINING_DIR/iter_${i}"; done
 for ((i=1; i<=BASELINE_ITERATIONS; i++)); do mkdir -p "$LOG_BASELINE_DIR/iter_${i}"; done
@@ -132,7 +127,7 @@ fi
 PIDS+=($!)
 
 cd "$WORKING_DIR" || exit 1
-# Coordinator before calc_path: calc_path waits for trial metadata on UDP 1322.
+# Coordinator started first so con_led is guaranteed trial meta before the first flash fires.
 # Tee coordinator stdout so iteration/trial state appears in the experiment driver log (e.g. NiceGUI).
 # Coordinator exits after the last trial; we wait on it so the driver tears down Unity and other children.
 python3 "$coordinator_exe" \
@@ -146,10 +141,6 @@ python3 "$coordinator_exe" \
     --training-zones "$TRAINING_ZONES" \
     --probing-zones "$PROBING_ZONES" \
     --flash-csv-dir "$FLASH_CSV_DIR" \
-    --training-csv-dir "$TRAINING_CSV_DIR" \
-    --probing-csv-dir "$PROBING_CSV_DIR" \
-    --baseline-csv-dir "$BASELINE_CSV_DIR" \
-    --openloop-csv-dir "$OPENLOOP_TRAINING_CSV_DIR" \
     --log-file "$LOG_CONTINUOUS_DIR/trial_coordinator_${ITER_TIMESTAMP}.log" \
     > >(tee -a "$LOG_CONTINUOUS_DIR/trial_coordinator_stdout_${ITER_TIMESTAMP}.log") 2>&1 &
 COORDINATOR_PID=$!

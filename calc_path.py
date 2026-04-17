@@ -1,6 +1,4 @@
-import csv
 import json
-import os
 
 import numpy as np
 import socket
@@ -8,14 +6,12 @@ import time as _time
 import argparse
 from numba import jit
 
-TRIAL_META_PORT = 1322
-
 # Args
 parser = argparse.ArgumentParser(description="Integrate FicTrac motion and stream pose to Unity over UDP.")
 parser.add_argument(
     "--path-length",
     type=float,
-    default=100.0,
+    default=130.0,
     help="Virtual corridor length in z units. z wraps forward at z0+path_length. Use <=0 to disable wrapping.",
 )
 parser.add_argument(
@@ -33,7 +29,7 @@ parser.add_argument(
 parser.add_argument(
     "--trial-start-z",
     type=float,
-    default=0.01,
+    default=0.0,
     help="Starting z position used at startup and after each wrap/teleport.",
 )
 args = parser.parse_args()
@@ -45,10 +41,6 @@ send_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 send_addr = ("127.0.0.1", 1318)  # Send updated position here
 boundary_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 boundary_addr = (args.boundary_ip, args.boundary_port)
-
-trial_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-trial_sock.bind(("127.0.0.1", TRIAL_META_PORT))
-trial_sock.setblocking(False)
 
 # JIT-optimized function to convert local movement to global dx, dz
 @jit(nopython=True)
@@ -67,81 +59,19 @@ x, z, r = 0.0, 0.0, 0.0
 # Gains
 gain_ds = 1.0
 gain_df = 1.0
-gain_dr = 1.0
+gain_dr = 0.0
 gain_dx = 0.0
 gain_dz = 3.9
 gain_r = 0.0
 
-# Send initial position for several seconds so Unity (starts later) receives the trial start position.
 z0 = float(args.trial_start_z)
 path_length = float(args.path_length)
-init_z = z0
-recv_socket.settimeout(0.02)
-t0 = _time.monotonic()
-while _time.monotonic() - t0 < 3.0:
-    try:
-        recv_socket.recvfrom(1024)
-    except socket.timeout:
-        pass
-    send_socket.sendto(f"{init_z:.1f},{x:.1f},{r:.1f}".encode(), send_addr)
-    _time.sleep(1 / 60.0)
-recv_socket.settimeout(None)
-z = init_z
+z = z0
 teleport_count = 0
-
-path_file = None
-path_writer = None
-last_trial_key = None
-trial_start_wall_time = _time.time()
-
-
-def _close_path_csv():
-    global path_file, path_writer
-    if path_file is not None:
-        path_file.close()
-        path_file = None
-        path_writer = None
-
-
-def _open_path_csv(path: str):
-    global path_file, path_writer
-    _close_path_csv()
-    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    path_file = open(path, "w", newline="", encoding="utf-8")
-    path_writer = csv.writer(path_file)
-    path_writer.writerow(["t_sec", "z", "x", "r"])
-
-
-def _drain_trial_meta():
-    global last_trial_key, trial_start_wall_time
-    try:
-        while True:
-            data, _ = trial_sock.recvfrom(8192)
-            meta = json.loads(data.decode("utf-8"))
-            if meta.get("event") != "active_trial":
-                continue
-            key = (
-                str(meta.get("phase", "")),
-                int(meta.get("iteration", 0)),
-                int(meta.get("trial", 0)),
-                int(meta.get("global_trial_index", 0)),
-            )
-            if key == last_trial_key:
-                continue
-            last_trial_key = key
-            trial_start_wall_time = float(meta.get("trial_start_wall_time", _time.time()))
-            out_path = meta.get("path_csv_output")
-            if out_path:
-                _open_path_csv(out_path)
-    except BlockingIOError:
-        pass
-
-
-# Wait for first trial metadata so path CSV path matches coordinator flash naming.
-while last_trial_key is None:
-    _drain_trial_meta()
-    if last_trial_key is None:
-        _time.sleep(0.01)
+# Unity is started last and may not yet be bound to the receive port; the main
+# loop below will keep streaming (z0, 0, 0) every FicTrac frame while the fly
+# is still, so Unity latches onto z0 as soon as it comes up.
+print(f"[calc_path] trial_start_z={z0:.3f}, path_length={path_length:.3f}", flush=True)
 
 # Main loop
 while True:
@@ -188,12 +118,6 @@ while True:
                 )
         else:
             z = new_z
-
-    _drain_trial_meta()
-    if path_writer is not None and path_file is not None:
-        t_sec = _time.time() - trial_start_wall_time
-        path_writer.writerow([f"{t_sec:.9f}", f"{z:.9f}", f"{x:.9f}", f"{r:.9f}"])
-        path_file.flush()
 
     # Send result and emit a tagged status line for GUI live position display.
     send_data = f"{z:.1f},{x:.1f},{r:.1f}".encode()

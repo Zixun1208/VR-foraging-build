@@ -6,7 +6,7 @@ import logging
 import warnings
 import argparse
 import signal
-from time import sleep, time
+from time import sleep, time, perf_counter
 from math import log, exp
 import json
 from nidaqmx.system import System
@@ -255,6 +255,7 @@ def udp_daq_control():
     output_state = False
     next_flash_time = time()
     pulse_end_time = None
+    last_csv_flush_time = time()
     zone = -1
     trial_start_wall_time = time()
     zone_elapsed_time_sec: dict[int, float] = {}
@@ -339,6 +340,7 @@ def udp_daq_control():
                                 args.min_amplitude_volts,
                             )
                             output_state, next_flash_time, pulse_end_time, _ = reset_flash_state(current_time)
+                            write_zero(task)
 
                             new_csv_path = meta.get("flash_csv_output", active_csv_path)
                             if new_csv_path != active_csv_path:
@@ -346,6 +348,9 @@ def udp_daq_control():
                                     csv_file.close()
                                 active_csv_path = new_csv_path
                                 csv_file, csv_writer = open_csv(active_csv_path)
+                            elif csv_file is not None:
+                                csv_file.flush()
+                            last_csv_flush_time = current_time
 
                             last_reset_trial_key = new_trial_key
                             logging.info(
@@ -387,15 +392,18 @@ def udp_daq_control():
                         new_amplitude = z_max - (decay_constant * elapsed_time_sec)
                     new_amplitude = max(z_min, new_amplitude)
 
-                if output_state and pulse_end_time is not None and current_time >= pulse_end_time:
-                    write_zero(task)
+                if current_time >= next_flash_time:
+                    # Emit a single, self-contained pulse: ON -> precise wait -> OFF.
+                    # Doing ON/OFF inside one iteration makes the pulse width immune
+                    # to sleep jitter, GC pauses, and CSV/disk latency below.
+                    task.write(float(new_amplitude))
+                    pulse_deadline = perf_counter() + FLASH_ON_DURATION_SEC
+                    while perf_counter() < pulse_deadline:
+                        pass
+                    task.write(0.0)
+
                     output_state = False
                     pulse_end_time = None
-
-                if not output_state and current_time >= next_flash_time:
-                    output_state = True
-                    task.write(float(new_amplitude))
-                    pulse_end_time = current_time + FLASH_ON_DURATION_SEC
                     next_flash_time = current_time + flash_period_sec
 
                     if csv_writer is not None:
@@ -410,9 +418,17 @@ def udp_daq_control():
                             f"{new_amplitude:.6f}",
                             f"{args.flash_freq_hz:.4f}",
                         ])
-                        csv_file.flush()
+                        # Flush at ~1 Hz instead of every flash to keep the
+                        # occasional slow fsync() off the flash critical path.
+                        if current_time - last_csv_flush_time >= 1.0:
+                            csv_file.flush()
+                            last_csv_flush_time = current_time
 
-                sleep(0.001)
+                # Yield to the scheduler without blocking on the sleep timer; the
+                # flash moment is gated by wall-clock, and the pulse width is
+                # pinned by the busy-wait above, so we want to poll as tightly
+                # as the OS allows for minimum period jitter.
+                sleep(0)
 
         except KeyboardInterrupt:
             logging.info("Interrupted by user. Setting analog output to 0V and exiting.")

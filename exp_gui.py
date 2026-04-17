@@ -33,7 +33,7 @@ paths: dict[str, str] = {
     "iterations": "15",
     "training_trials_per_iteration": "1",
     "probing_trials_per_iteration": "1",
-    "path_length": "100",
+    "path_length": "130",
     "openloop_zones": "0:150,1:300",
     "baseline_zones": "0:none,1:none",
     "training_zones": "0:100,1:20",
