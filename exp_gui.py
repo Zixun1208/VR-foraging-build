@@ -43,7 +43,7 @@ paths: dict[str, str] = {
     "zone0_min_volts": "0.2",
     "zone1_max_volts": "5.0",
     "zone1_min_volts": "0.2",
-    "flash_frequency_hz": "50.0",
+    "flash_freq_hz": "50.0",
     "decay_mode": "exp",
     "trial_start_z": "",
 }
@@ -76,7 +76,7 @@ PARAM_FIELDS: list[tuple[str, str]] = [
     ("Zone 0 min amplitude (V):", "zone0_min_volts"),
     ("Zone 1 max amplitude (V):", "zone1_max_volts"),
     ("Zone 1 min amplitude (V):", "zone1_min_volts"),
-    ("Flash frequency (Hz):", "flash_frequency_hz"),
+    ("Flash frequency (Hz):", "flash_freq_hz"),
     ("Decay mode (exp|linear):", "decay_mode"),
     ("Trial start z (blank=default):", "trial_start_z"),
 ]
@@ -183,6 +183,8 @@ def main_page() -> None:
             m = str(saved["min_amplitude_volts"])
             paths["zone0_min_volts"] = m
             paths["zone1_min_volts"] = m
+        if "flash_freq_hz" not in saved and "flash_frequency_hz" in saved:
+            paths["flash_freq_hz"] = str(saved["flash_frequency_hz"])
         paths["iterations"] = str(
             saved.get("iterations", saved.get("training_iterations", paths["iterations"]))
         )
@@ -339,7 +341,7 @@ def main_page() -> None:
         z0_min = paths["zone0_min_volts"]
         z1_max = paths["zone1_max_volts"]
         z1_min = paths["zone1_min_volts"]
-        flash_frequency_hz = paths["flash_frequency_hz"]
+        flash_freq_hz = paths["flash_freq_hz"]
         decay_mode = paths["decay_mode"].strip().lower()
         trial_start_z = paths["trial_start_z"].strip()
 
@@ -423,7 +425,7 @@ def main_page() -> None:
             "--min-amplitude-volts",
             min_amplitude_volts,
             "--flash-frequency-hz",
-            flash_frequency_hz,
+            flash_freq_hz,
             "--decay-mode",
             decay_mode,
         ]
