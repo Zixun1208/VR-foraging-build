@@ -7,7 +7,7 @@ Python and shell tooling to run **closed-loop VR foraging** on flies with **FicT
 | Component | Role |
 |-----------|------|
 | `calc_path.py` | Listens for FicTrac UDP data, integrates position/orientation, sends pose to Unity on UDP. |
-| `con_led_exp.py` | Listens for reward cues from Unity (UDP), drives the reward LED via NI-DAQ with configurable zone decay; logs flash events to CSV. |
+| `con_led.py` | Listens for reward cues from Unity (UDP), drives the reward LED via NI-DAQ with configurable zone decay; logs flash events to CSV. |
 | `openloop_sim.py` | Feeds scripted position/orientation over UDP for open-loop training (no fly-driven motion). |
 | `con_lum.py` | Sets up / controls ambient LED illumination (separate from reward). |
 | `run_experiment.sh` | Orchestrates FicTrac, Unity, Python helpers, trial timers, logs, and inter-session gaps. |
@@ -27,8 +27,8 @@ Trial length is controlled by **session time** (seconds), not by a fixed step co
 - Linux (paths and scripts assume a POSIX shell).
 - **FicTrac** built and a camera config (e.g. `config.txt`).
 - **Unity** Linux player for your foraging scene, invoked with `--csvDirectory` pointing at the session CSV folder.
-- **Python 3** with `numpy`, `numba` (`calc_path.py`), **`nidaqmx`** (`con_led_exp.py`), and **`ttkbootstrap`** (`exp_gui.py`). The sample `run_experiment.sh` activates a Conda env named `daqcon`—adjust to match your setup.
-- **NI-DAQ** hardware and channels matching `con_led_exp.py` (default channel is edited in that file).
+- **Python 3** with `numpy`, `numba` (`calc_path.py`), **`nidaqmx`** (`con_led.py`), and **`ttkbootstrap`** (`exp_gui.py`). The sample `run_experiment.sh` activates a Conda env named `daqcon`—adjust to match your setup.
+- **NI-DAQ** hardware and channels matching `con_led.py` (default channel is edited in that file).
 
 ## Configuration
 
@@ -63,7 +63,7 @@ Logs and per-trial stdout/stderr land under the session working directory (see `
 
 - **1317** — FicTrac → `calc_path.py`
 - **1318** — position stream → Unity / open-loop sim
-- **1319** — Unity → `con_led_exp.py` (reward signaling)
+- **1319** — Unity → `con_led.py` (reward signaling)
 
 Keep firewalls and any other consumers aligned with these ports.
 

@@ -4,7 +4,7 @@
   "fictrac_exe": "/home/kazama/fictrac/bin/fictrac",
   "fictrac_config": "/home/kazama/fictrac/fictrac_config/config1.txt",
   "calc_path_py": "/home/kazama/Experiment_builds/VR-foraging-build/calc_path.py",
-  "con_led_py": "/home/kazama/Experiment_builds/VR-foraging-build/con_led_exp.py",
+  "con_led_py": "/home/kazama/Experiment_builds/VR-foraging-build/con_led.py",
   "openloop_sim_py": "/home/kazama/Experiment_builds/VR-foraging-build/openloop_sim.py",
   "working_dir": "/home/kazama/Experiment_log",
   "csv_main_dir": "/home/kazama/Raw_data/foraging",
@@ -23,7 +23,7 @@
   "zone0_min_volts": "0.5",
   "zone1_max_volts": "4",
   "zone1_min_volts": "0.5",
-  "flash_frequency_hz": "50",
+  "flash_freq_hz": "50",
   "decay_mode": "linear",
   "trial_start_z": ""
 }

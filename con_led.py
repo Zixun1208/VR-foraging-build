@@ -115,7 +115,13 @@ parser.add_argument(
     default=0.2,
     help="Fallback min (V) for zones not listed in --min-amplitude-volts-by-zone.",
 )
-parser.add_argument("--flash-frequency-hz", type=float, default=FLASH_FREQUENCY, help="Fixed pulse frequency.")
+parser.add_argument(
+    "--flash-frequency-hz",
+    dest="flash_freq_hz",
+    type=float,
+    default=FLASH_FREQUENCY,
+    help="Fixed pulse frequency.",
+)
 parser.add_argument(
     "--decay-mode",
     type=str,
@@ -216,7 +222,7 @@ def open_csv(csv_output_path):
         "zone",
         "elapsed_time_sec",
         "amplitude_volts",
-        "flash_frequency_hz",
+        "flash_freq_hz",
     ])
     logging.info(f"Flash-ON events will be recorded to: {csv_output_path}")
     return csv_file, csv_writer
@@ -261,7 +267,7 @@ def udp_daq_control():
     last_reset_trial_key: tuple[str, int, int, int] | None = None
     active_csv_path = args.csv_output
     zone_decay_constants = dict(default_zone_decay_constants)
-    flash_period_sec = 1.0 / args.flash_frequency_hz
+    flash_period_sec = 1.0 / args.flash_freq_hz
 
     csv_file, csv_writer = open_csv(active_csv_path)
 
@@ -402,7 +408,7 @@ def udp_daq_control():
                             zone,
                             f"{elapsed_time_sec:.4f}",
                             f"{new_amplitude:.6f}",
-                            f"{args.flash_frequency_hz:.4f}",
+                            f"{args.flash_freq_hz:.4f}",
                         ])
                         csv_file.flush()
 
