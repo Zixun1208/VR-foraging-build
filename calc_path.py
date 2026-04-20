@@ -66,12 +66,15 @@ gain_r = 0.0
 
 z0 = float(args.trial_start_z)
 path_length = float(args.path_length)
-z = z0
+z = (z0 % path_length) if path_length > 0 else z0
 teleport_count = 0
 # Unity is started last and may not yet be bound to the receive port; the main
 # loop below will keep streaming (z0, 0, 0) every FicTrac frame while the fly
 # is still, so Unity latches onto z0 as soon as it comes up.
-print(f"[calc_path] trial_start_z={z0:.3f}, path_length={path_length:.3f}", flush=True)
+print(
+    f"[calc_path] trial_start_z={z0:.3f}, initial_z={z:.3f}, path_length={path_length:.3f}",
+    flush=True,
+)
 
 # Main loop
 while True:
@@ -96,28 +99,25 @@ while True:
     # Transform movement
     dx, dz = calculate_dx_dz(ds, df, r, gain_ds, gain_df)
 
-    # Update z (floor only; wrap forward at end of corridor)
+    # Update z (corridor bounds are absolute: [0, path_length))
     new_z = z + gain_dz * dz
-    if new_z < z0:
-        z = z0
+    if path_length > 0:
+        did_wrap = (new_z >= path_length) or (new_z < 0.0)
+        z = new_z % path_length
+        if did_wrap:
+            teleport_count += 1
+            boundary_message = {
+                "event": "teleport_boundary",
+                "teleport_count": teleport_count,
+                "frame_count": frame_count,
+                "wall_time": _time.time(),
+            }
+            boundary_socket.sendto(
+                json.dumps(boundary_message).encode("utf-8"),
+                boundary_addr,
+            )
     else:
-        if path_length > 0:
-            did_wrap = (new_z - z0) >= path_length
-            z = z0 + ((new_z - z0) % path_length)
-            if did_wrap:
-                teleport_count += 1
-                boundary_message = {
-                    "event": "teleport_boundary",
-                    "teleport_count": teleport_count,
-                    "frame_count": frame_count,
-                    "wall_time": _time.time(),
-                }
-                boundary_socket.sendto(
-                    json.dumps(boundary_message).encode("utf-8"),
-                    boundary_addr,
-                )
-        else:
-            z = new_z
+        z = new_z
 
     # Send result and emit a tagged status line for GUI live position display.
     send_data = f"{z:.1f},{x:.1f},{r:.1f}".encode()
