@@ -61,7 +61,7 @@ gain_ds = 1.0
 gain_df = 1.0
 gain_dr = 0.0
 gain_dx = 0.0
-gain_dz = 3.9
+gain_dz = 4.0
 gain_r = 0.0
 
 z0 = float(args.trial_start_z)
@@ -100,11 +100,13 @@ while True:
     dx, dz = calculate_dx_dz(ds, df, r, gain_ds, gain_df)
 
     # Update z (corridor bounds are absolute: [0, path_length))
+    # Only the forward edge triggers a teleport; the lower edge is clamped to 0
+    # so small backwards fluctuations near the start don't wrap to path_length
+    # and spuriously "restart" the trial.
     new_z = z + gain_dz * dz
     if path_length > 0:
-        did_wrap = (new_z >= path_length) or (new_z < 0.0)
-        z = new_z % path_length
-        if did_wrap:
+        if new_z >= path_length:
+            z = new_z % path_length
             teleport_count += 1
             boundary_message = {
                 "event": "teleport_boundary",
@@ -116,6 +118,10 @@ while True:
                 json.dumps(boundary_message).encode("utf-8"),
                 boundary_addr,
             )
+        elif new_z < 0.0:
+            z = 0.0
+        else:
+            z = new_z
     else:
         z = new_z
 
