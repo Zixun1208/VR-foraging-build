@@ -85,9 +85,11 @@ while True:
         # FicTrac socket lines are "FT, <csv...>" (see Trackball.cpp addMsg).
         off = 1 if parsed_data and parsed_data[0].upper() == "FT" else 0
         frame_count = int(float(parsed_data[off]))
-        ds = float(parsed_data[off + 6])
-        df = float(parsed_data[off + 7])
-        dr = float(parsed_data[off + 8])
+        # FicTrac columns 6-8 are delta rotation vector (lab): x, y, z.
+        # Its own trackball integration maps y to forward motion and z to heading.
+        ds = -float(parsed_data[off + 5])
+        df = float(parsed_data[off + 6])
+        dr = float(parsed_data[off + 7])
     except (ValueError, IndexError):
         continue
 
