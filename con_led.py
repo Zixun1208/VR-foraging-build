@@ -6,6 +6,7 @@ import logging
 import warnings
 import argparse
 import signal
+import sys
 from time import sleep, time, perf_counter
 from math import log, exp
 import json
@@ -128,6 +129,11 @@ parser.add_argument(
     default="exp",
     choices=["exp", "linear"],
     help="Decay profile for amplitude vs elapsed time in zone.",
+)
+parser.add_argument(
+    "--check-daq",
+    action="store_true",
+    help="Probe the DAQ AO channel and exit 0 (ok) or 1 (unavailable). No sockets or tasks are created.",
 )
 args = parser.parse_args()
 
@@ -447,6 +453,16 @@ def udp_daq_control():
                 logging.info(f"Flash CSV closed: {active_csv_path}")
 
 if __name__ == "__main__":
+    if args.check_daq:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+        try:
+            ch = resolve_ao_channel(args.ao_channel)
+            print(f"[PREFLIGHT OK] DAQ AO channel ready: {ch}")
+            sys.exit(0)
+        except RuntimeError as exc:
+            print(f"[PREFLIGHT ERROR] {exc}")
+            sys.exit(1)
+
     signal.signal(signal.SIGTERM, request_shutdown)
     signal.signal(signal.SIGINT, request_shutdown)
     udp_daq_control()

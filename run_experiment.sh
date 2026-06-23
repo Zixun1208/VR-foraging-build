@@ -115,6 +115,46 @@ cleanup() {
 trap cleanup EXIT
 
 activate_conda
+
+# ── Pre-flight checks ──────────────────────────────────────────────
+preflight_ok=1
+
+check_file() {
+    local label="$1" path="$2"
+    if [[ ! -f "$path" ]]; then
+        echo "[PREFLIGHT ERROR] $label not found: $path" | tee -a "$SCRIPT_LOG"
+        preflight_ok=0
+    fi
+}
+
+check_file "Unity executable"    "$UNITY_EXE"
+check_file "calc_path.py"        "$calc_path_exe"
+check_file "con_led.py"          "$con_led_exe"
+check_file "trial_coordinator"   "$coordinator_exe"
+
+if [[ "$USE_FICTRAC_SIM" == "1" ]]; then
+    check_file "FicTrac sim stub" "$FICTRAC_SIM_EXE"
+else
+    check_file "FicTrac executable" "$FICTRAC_EXE"
+    check_file "FicTrac config"     "$FICTRAC_CONFIG"
+fi
+
+if [[ "$preflight_ok" -eq 0 ]]; then
+    echo "[PREFLIGHT ERROR] One or more required files are missing — aborting." | tee -a "$SCRIPT_LOG"
+    exit 1
+fi
+
+echo "Running DAQ pre-flight probe for AO channel '$AO_CHANNEL'..." | tee -a "$SCRIPT_LOG"
+daq_probe_output=$(python3 "$con_led_exe" --check-daq --ao-channel "$AO_CHANNEL" 2>&1)
+daq_probe_rc=$?
+echo "$daq_probe_output" | tee -a "$SCRIPT_LOG"
+if [[ "$daq_probe_rc" -ne 0 ]]; then
+    echo "[PREFLIGHT ERROR] DAQ/AO device unavailable for $AO_CHANNEL — aborting." | tee -a "$SCRIPT_LOG"
+    exit 1
+fi
+echo "Pre-flight checks passed." | tee -a "$SCRIPT_LOG"
+# ── End pre-flight ─────────────────────────────────────────────────
+
 ITER_TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 echo "Starting continuous teleport-driven experiment..." | tee -a "$SCRIPT_LOG"
 
@@ -124,7 +164,8 @@ if [[ "$USE_FICTRAC_SIM" == "1" ]]; then
 else
     "$FICTRAC_EXE" "$FICTRAC_CONFIG" >> "$LOG_CONTINUOUS_DIR/fictrac_${ITER_TIMESTAMP}.log" 2>&1 &
 fi
-PIDS+=($!)
+FICTRAC_PID=$!
+PIDS+=($FICTRAC_PID)
 
 cd "$WORKING_DIR" || exit 1
 # Coordinator started first so con_led is guaranteed trial meta before the first flash fires.
@@ -153,7 +194,8 @@ if [[ -n "$TRIAL_START_Z" ]]; then
     calc_path_cmd+=(--trial-start-z "$TRIAL_START_Z")
 fi
 "${calc_path_cmd[@]}" > >(tee -a "$LOG_CONTINUOUS_DIR/calc_path_${ITER_TIMESTAMP}.log") 2>&1 &
-PIDS+=($!)
+CALC_PATH_PID=$!
+PIDS+=($CALC_PATH_PID)
 
 python3 "$con_led_exe" \
     --zones "$TRAINING_ZONES" \
@@ -165,13 +207,41 @@ python3 "$con_led_exe" \
     --flash-frequency-hz "$FLASH_FREQUENCY_HZ" \
     --decay-mode "$DECAY_MODE" \
     --csv-output "$FLASH_CSV_DIR/initial_training_iter_1_trial_1_${ITER_TIMESTAMP}.csv" \
-    >> "$LOG_CONTINUOUS_DIR/con_led_${ITER_TIMESTAMP}.log" 2>&1 &
-PIDS+=($!)
+    > >(tee -a "$LOG_CONTINUOUS_DIR/con_led_${ITER_TIMESTAMP}.log") 2>&1 &
+CON_LED_PID=$!
+PIDS+=($CON_LED_PID)
 
 "$UNITY_EXE" --csvDirectory "$UNITY_CSV_DIR" >> "$LOG_CONTINUOUS_DIR/unity_${ITER_TIMESTAMP}.log" 2>&1 &
 UNITY_PID=$!
 PIDS+=($UNITY_PID)
 
 echo "Continuous run active. Trials advance on teleport boundaries; run ends when all trials complete." | tee -a "$SCRIPT_LOG"
+
+# ── Runtime component monitor ──────────────────────────────────────
+WARNED_FICTRAC=0
+WARNED_CALC_PATH=0
+WARNED_CON_LED=0
+WARNED_UNITY=0
+
+while kill -0 "$COORDINATOR_PID" 2>/dev/null; do
+    if [[ "$WARNED_FICTRAC" -eq 0 ]] && ! kill -0 "$FICTRAC_PID" 2>/dev/null; then
+        echo "[COMPONENT ERROR] FicTrac exited unexpectedly (ball tracking stopped)." | tee -a "$SCRIPT_LOG"
+        WARNED_FICTRAC=1
+    fi
+    if [[ "$WARNED_CALC_PATH" -eq 0 ]] && ! kill -0 "$CALC_PATH_PID" 2>/dev/null; then
+        echo "[COMPONENT ERROR] calc_path exited unexpectedly (path integration stopped)." | tee -a "$SCRIPT_LOG"
+        WARNED_CALC_PATH=1
+    fi
+    if [[ "$WARNED_CON_LED" -eq 0 ]] && ! kill -0 "$CON_LED_PID" 2>/dev/null; then
+        echo "[COMPONENT ERROR] con_led exited unexpectedly (DAQ/LED output stopped)." | tee -a "$SCRIPT_LOG"
+        WARNED_CON_LED=1
+    fi
+    if [[ "$WARNED_UNITY" -eq 0 ]] && ! kill -0 "$UNITY_PID" 2>/dev/null; then
+        echo "[COMPONENT ERROR] Unity exited unexpectedly (VR rendering stopped)." | tee -a "$SCRIPT_LOG"
+        WARNED_UNITY=1
+    fi
+    sleep 1
+done
 wait "$COORDINATOR_PID"
+# ── End runtime monitor ────────────────────────────────────────────
 

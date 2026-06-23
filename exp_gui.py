@@ -313,6 +313,10 @@ def main_page() -> None:
                         continue
 
                     experiment_log.push(text)
+                    if "[PREFLIGHT ERROR]" in text or "[COMPONENT ERROR]" in text:
+                        ui.notify(text, type="negative", close_button=True, timeout=0)
+                    elif "[COMPONENT WARNING]" in text:
+                        ui.notify(text, type="warning", close_button=True, timeout=0)
         except queue.Empty:
             pass
         now = monotonic()
