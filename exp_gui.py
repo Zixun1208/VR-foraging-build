@@ -25,7 +25,6 @@ paths: dict[str, str] = {
     "fictrac_config": "",
     "calc_path_py": "",
     "con_led_py": "",
-    "openloop_sim_py": "",
     "working_dir": "",
     "csv_main_dir": "",
     "openloop_training_iterations": "0",
@@ -33,7 +32,16 @@ paths: dict[str, str] = {
     "iterations": "15",
     "training_trials_per_iteration": "1",
     "probing_trials_per_iteration": "1",
-    "path_length": "130",
+    "openloop_session_time_sec": "60",
+    "baseline_session_time_sec": "60",
+    "training_session_time_sec": "60",
+    "probing_session_time_sec": "60",
+    "x_min": "-100",
+    "x_max": "100",
+    "z_min": "-100",
+    "z_max": "100",
+    "trial_start_x": "0",
+    "trial_start_z": "0",
     "openloop_zones": "0:150,1:300",
     "baseline_zones": "0:none,1:none",
     "training_zones": "0:100,1:20",
@@ -45,7 +53,6 @@ paths: dict[str, str] = {
     "zone1_min_volts": "0.2",
     "flash_freq_hz": "50.0",
     "decay_mode": "exp",
-    "trial_start_z": "",
 }
 
 FILE_FIELDS: list[tuple[str, str, bool]] = [
@@ -57,7 +64,6 @@ FILE_FIELDS: list[tuple[str, str, bool]] = [
     ("con_led.py", "con_led_py", False),
     ("Working Directory", "working_dir", True),
     ("CSV Main Directory", "csv_main_dir", True),
-    ("openloop_sim.py", "openloop_sim_py", False),
 ]
 
 PARAM_FIELDS: list[tuple[str, str]] = [
@@ -66,19 +72,31 @@ PARAM_FIELDS: list[tuple[str, str]] = [
     ("Iterations:", "iterations"),
     ("Training trials per iteration:", "training_trials_per_iteration"),
     ("Probing trials per iteration:", "probing_trials_per_iteration"),
-    ("Path length (z units):", "path_length"),
+    ("Openloop session time (sec):", "openloop_session_time_sec"),
+    ("Baseline session time (sec):", "baseline_session_time_sec"),
+    ("Training session time (sec):", "training_session_time_sec"),
+    ("Probing session time (sec):", "probing_session_time_sec"),
     ("Openloop zones (zone:decay,...):", "openloop_zones"),
     ("Baseline zones (zone:decay,...):", "baseline_zones"),
     ("Training zones (zone:decay,...):", "training_zones"),
     ("Probing zones (zone:decay,...):", "probing_zones"),
     ("AO channel:", "ao_channel"),
-    ("Zone 0 max amplitude (V):", "zone0_max_volts"),
-    ("Zone 0 min amplitude (V):", "zone0_min_volts"),
-    ("Zone 1 max amplitude (V):", "zone1_max_volts"),
-    ("Zone 1 min amplitude (V):", "zone1_min_volts"),
+    ("Zone 0 / blue max amplitude (V):", "zone0_max_volts"),
+    ("Zone 0 / blue min amplitude (V):", "zone0_min_volts"),
+    ("Zone 1 / green max amplitude (V):", "zone1_max_volts"),
+    ("Zone 1 / green min amplitude (V):", "zone1_min_volts"),
     ("Flash frequency (Hz):", "flash_freq_hz"),
     ("Decay mode (exp|linear):", "decay_mode"),
-    ("Trial start z (blank=default):", "trial_start_z"),
+]
+
+# calc_path.py world clamp bounds and initial fly pose (2D arena).
+WORLD_FIELDS: list[tuple[str, str]] = [
+    ("X min (world units):", "x_min"),
+    ("X max (world units):", "x_max"),
+    ("Z min (world units):", "z_min"),
+    ("Z max (world units):", "z_max"),
+    ("Starting position x:", "trial_start_x"),
+    ("Starting position z:", "trial_start_z"),
 ]
 
 field_inputs: dict[str, ui.input] = {}
@@ -152,11 +170,15 @@ def _picker_start_dir(raw: str) -> Path:
 
 async def browse_path(key: str, is_dir: bool) -> None:
     """Server-side filesystem picker (NiceGUI local_file_picker example)."""
-    start = _picker_start_dir(field_inputs[key].value or "")
+    inp = field_inputs.get(key)
+    if inp is None:
+        return
+    start = _picker_start_dir(inp.value or "")
     picker = local_file_picker(str(start), pick_directory=is_dir, upper_limit=None)
     result = await picker
     if result:
-        field_inputs[key].value = result[0]
+        inp.value = result[0]
+        inp.update()
 
 
 @ui.page("/")
@@ -188,6 +210,24 @@ def main_page() -> None:
         paths["iterations"] = str(
             saved.get("iterations", saved.get("training_iterations", paths["iterations"]))
         )
+        # Legacy 1D corridor config: path_length is ignored by calc_path in 2D mode.
+        if "x_min" not in saved and "path_length" in saved:
+            paths.setdefault("x_min", "-100")
+            paths.setdefault("x_max", "100")
+            paths.setdefault("z_min", "-100")
+            paths.setdefault("z_max", "100")
+        if "trial_start_x" not in saved:
+            paths["trial_start_x"] = str(saved.get("starting_position_x", "0"))
+        if "trial_start_z" not in saved:
+            paths["trial_start_z"] = str(saved.get("starting_position_z", "0"))
+        for legacy_key, new_key in (
+            ("training_session_time", "training_session_time_sec"),
+            ("baseline_session_time", "baseline_session_time_sec"),
+            ("probing_session_time", "probing_session_time_sec"),
+            ("openloop_session_time", "openloop_session_time_sec"),
+        ):
+            if new_key not in saved and legacy_key in saved:
+                paths[new_key] = str(saved[legacy_key])
         for key, inp in field_inputs.items():
             inp.value = str(paths.get(key, ""))
 
@@ -236,6 +276,7 @@ def main_page() -> None:
                                 result = await picker
                                 if result:
                                     config_path_input.value = result[0]
+                                    config_path_input.update()
 
                             ui.button("Browse", on_click=_browse_config).props("dense flat")
                             ui.button("Load", on_click=lambda: load_config_from_disk(silent=False)).props(
@@ -258,6 +299,20 @@ def main_page() -> None:
                                     await browse_path(k, directory)
 
                                 ui.button("Browse", on_click=_browse).props("dense flat")
+
+                    with ui.card().classes("w-full"):
+                        ui.label("2D arena (calc_path)").classes("text-subtitle1 text-weight-medium")
+                        ui.label(
+                            "Clamp bounds and initial fly position sent to calc_path.py at session start."
+                        ).classes("text-caption text-grey q-mb-xs")
+                        for label, key in WORLD_FIELDS:
+                            with ui.row().classes("w-full items-center no-wrap q-gutter-x-sm"):
+                                ui.label(label).classes("w-48 shrink-0 text-right")
+                                field_inputs[key] = (
+                                    ui.input(value=paths[key])
+                                    .props("dense outlined")
+                                    .classes("flex-grow min-w-0")
+                                )
 
                     with ui.card().classes("w-full"):
                         ui.label("Session parameters").classes("text-subtitle1 text-weight-medium")
@@ -335,7 +390,16 @@ def main_page() -> None:
         training_trials_per_iter = paths["training_trials_per_iteration"]
         probing_trials_per_iter = paths["probing_trials_per_iteration"]
         openloop_training_iterations = paths["openloop_training_iterations"]
-        path_length = paths["path_length"]
+        openloop_session_time_sec = paths["openloop_session_time_sec"].strip()
+        baseline_session_time_sec = paths["baseline_session_time_sec"].strip()
+        training_session_time_sec = paths["training_session_time_sec"].strip()
+        probing_session_time_sec = paths["probing_session_time_sec"].strip()
+        x_min = paths["x_min"].strip()
+        x_max = paths["x_max"].strip()
+        z_min = paths["z_min"].strip()
+        z_max = paths["z_max"].strip()
+        trial_start_x = paths["trial_start_x"].strip()
+        trial_start_z = paths["trial_start_z"].strip()
         openloop_zones = paths["openloop_zones"]
         baseline_zones = paths["baseline_zones"]
         training_zones = paths["training_zones"]
@@ -347,10 +411,20 @@ def main_page() -> None:
         z1_min = paths["zone1_min_volts"]
         flash_freq_hz = paths["flash_freq_hz"]
         decay_mode = paths["decay_mode"].strip().lower()
-        trial_start_z = paths["trial_start_z"].strip()
 
         if decay_mode not in {"exp", "linear"}:
             ui.notify("Decay mode must be 'exp' or 'linear'.", type="negative")
+            return
+        try:
+            openloop_session_f = float(openloop_session_time_sec)
+            baseline_session_f = float(baseline_session_time_sec)
+            training_session_f = float(training_session_time_sec)
+            probing_session_f = float(probing_session_time_sec)
+        except ValueError:
+            ui.notify("Session time fields must be numeric.", type="negative")
+            return
+        if min(openloop_session_f, baseline_session_f, training_session_f, probing_session_f) <= 0:
+            ui.notify("Session times must be greater than 0.", type="negative")
             return
         try:
             z0_max_f = float(z0_max)
@@ -370,12 +444,34 @@ def main_page() -> None:
         min_amplitude_volts = str(min(z0_min_f, z1_min_f))
         max_amplitude_volts_by_zone = f"0:{z0_max},1:{z1_max}"
         min_amplitude_volts_by_zone = f"0:{z0_min},1:{z1_min}"
-        if trial_start_z:
-            try:
-                float(trial_start_z)
-            except ValueError:
-                ui.notify("Trial start z must be numeric or blank.", type="negative")
-                return
+        try:
+            x_min_f = float(x_min)
+            x_max_f = float(x_max)
+            z_min_f = float(z_min)
+            z_max_f = float(z_max)
+        except ValueError:
+            ui.notify("World bound fields (x/z min/max) must be numeric.", type="negative")
+            return
+        if x_min_f >= x_max_f:
+            ui.notify("X min must be less than X max.", type="negative")
+            return
+        if z_min_f >= z_max_f:
+            ui.notify("Z min must be less than Z max.", type="negative")
+            return
+        try:
+            start_x_f = float(trial_start_x or "0")
+            start_z_f = float(trial_start_z or "0")
+        except ValueError:
+            ui.notify("Starting position x/z must be numeric.", type="negative")
+            return
+        if not (x_min_f <= start_x_f <= x_max_f):
+            ui.notify("Starting position x must be within x min and x max.", type="negative")
+            return
+        if not (z_min_f <= start_z_f <= z_max_f):
+            ui.notify("Starting position z must be within z min and z max.", type="negative")
+            return
+        trial_start_x = str(start_x_f)
+        trial_start_z = str(start_z_f)
 
         if not os.path.isfile(paths["bash_script"]):
             ui.notify(f"Bash script not found: {paths['bash_script']}", type="negative")
@@ -391,7 +487,6 @@ def main_page() -> None:
                 "CON_LED": paths["con_led_py"],
                 "WORKING_DIR": paths["working_dir"],
                 "CSV_MAIN_DIR": paths["csv_main_dir"],
-                "OPENLOOP_SIM": paths["openloop_sim_py"],
             }
         )
 
@@ -408,8 +503,22 @@ def main_page() -> None:
             probing_trials_per_iter,
             "--openloop-training-iterations",
             openloop_training_iterations,
-            "--path-length",
-            path_length,
+            "--openloop-session-time-sec",
+            openloop_session_time_sec,
+            "--baseline-session-time-sec",
+            baseline_session_time_sec,
+            "--training-session-time-sec",
+            training_session_time_sec,
+            "--probing-session-time-sec",
+            probing_session_time_sec,
+            "--x-min",
+            x_min,
+            "--x-max",
+            x_max,
+            "--z-min",
+            z_min,
+            "--z-max",
+            z_max,
             "--openloop-zones",
             openloop_zones,
             "--baseline-zones",
@@ -432,9 +541,11 @@ def main_page() -> None:
             flash_freq_hz,
             "--decay-mode",
             decay_mode,
+            "--trial-start-x",
+            trial_start_x,
+            "--trial-start-z",
+            trial_start_z,
         ]
-        if trial_start_z:
-            command.extend(["--trial-start-z", trial_start_z])
 
         start_btn.disable()
         stop_btn.enable()

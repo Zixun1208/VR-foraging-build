@@ -35,7 +35,11 @@ class local_file_picker(ui.dialog):
             self.add_drives_toggle()
             self.grid = ui.aggrid({
                 'columnDefs': [{'field': 'name', 'headerName': 'File'}],
-                'rowSelection': {'mode': 'multiRow' if multiple else 'singleRow'},
+                'rowSelection': {
+                    'mode': 'multiRow' if multiple else 'singleRow',
+                    # Required in AG Grid 32+: without this, click+Ok returns no selection.
+                    'enableClickSelection': True,
+                },
             }, html_columns=[0]).classes('w-96').on('cellDoubleClicked', self.handle_double_click)
             with ui.row().classes('w-full justify-end'):
                 ui.button('Cancel', on_click=self.close).props('outline')
@@ -84,9 +88,12 @@ class local_file_picker(ui.dialog):
         elif not self.pick_directory:
             self.submit([str(target)])
 
-    async def _handle_ok(self):
+    async def _handle_ok(self) -> None:
         if self.pick_directory:
             self.submit([str(self.path.resolve())])
             return
         rows = await self.grid.get_selected_rows()
+        if not rows:
+            ui.notify('Select a file first (click a row, or double-click to open).', type='warning')
+            return
         self.submit([r['path'] for r in rows])

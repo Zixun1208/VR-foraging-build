@@ -7,13 +7,13 @@ from datetime import datetime
 
 
 UDP_IP = "127.0.0.1"
-BOUNDARY_PORT = 1321
 TRIAL_META_PORT = 1320
+CALC_PATH_META_PORT = 1321
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Advance trial state on teleport boundaries and broadcast active trial metadata."
+        description="Advance trial state on session timers and broadcast active trial metadata."
     )
     parser.add_argument("--iterations", type=int, default=15)
     parser.add_argument("--training-trials-per-iteration", type=int, default=1)
@@ -24,6 +24,10 @@ def parse_args():
     parser.add_argument("--baseline-zones", type=str, default="0:none,1:none")
     parser.add_argument("--training-zones", type=str, default="0:100,1:20")
     parser.add_argument("--probing-zones", type=str, default="0:none,1:none")
+    parser.add_argument("--openloop-session-time-sec", type=float, default=60.0)
+    parser.add_argument("--baseline-session-time-sec", type=float, default=60.0)
+    parser.add_argument("--training-session-time-sec", type=float, default=60.0)
+    parser.add_argument("--probing-session-time-sec", type=float, default=60.0)
     parser.add_argument("--flash-csv-dir", type=str, required=True)
     parser.add_argument("--log-file", type=str, default=None)
     parser.add_argument("--meta-interval-sec", type=float, default=0.25)
@@ -43,6 +47,16 @@ def total_scheduled_trials(args) -> int:
             args.training_trials_per_iteration + args.probing_trials_per_iteration
         )
     return n
+
+
+def current_trial_duration_sec(schedule, args) -> float:
+    phase = schedule.current_spec()["phase"]
+    return {
+        "openloop_training": args.openloop_session_time_sec,
+        "baseline": args.baseline_session_time_sec,
+        "training": args.training_session_time_sec,
+        "probing": args.probing_session_time_sec,
+    }[phase]
 
 
 class TrialSchedule:
@@ -126,7 +140,7 @@ class TrialSchedule:
             "flash_csv_name": f"probing_iter_{it}_trial_{t}",
         }
 
-    def advance_after_boundary(self) -> bool:
+    def advance_trial(self) -> bool:
         """Advance to the next trial. Returns False if the schedule is finished."""
         a = self.args
         if self.block == "openloop":
@@ -193,14 +207,20 @@ def format_trial_status(meta, note=""):
     return "[trial] " + ", ".join(parts)
 
 
-def trial_progress_note(trial_global_index, teleport_count, initial=False):
-    note = f"global_trial_index={trial_global_index}, teleport_count={teleport_count}"
+def trial_progress_note(trial_global_index, initial=False):
+    note = f"global_trial_index={trial_global_index}"
     if initial:
         return f"(initial, {note})"
     return f"({note})"
 
 
-def build_metadata(trial_spec, trial_global_index, trial_start_wall_time, teleport_count, flash_csv_dir, args):
+def build_metadata(
+    trial_spec,
+    trial_global_index,
+    trial_start_wall_time,
+    trial_duration_sec,
+    flash_csv_dir,
+):
     # Millisecond-precision timestamp so the flash CSV filename itself
     # uniquely identifies the trial start and can be used to slice the
     # Unity path log by [trial_start, next_trial_start) wall-time windows.
@@ -214,9 +234,20 @@ def build_metadata(trial_spec, trial_global_index, trial_start_wall_time, telepo
         "global_trial_index": trial_global_index,
         "zones": trial_spec["zones"],
         "trial_start_wall_time": trial_start_wall_time,
-        "teleport_count": teleport_count,
+        "trial_duration_sec": trial_duration_sec,
         "flash_csv_output": csv_path,
     }
+
+
+def advance_to_next_trial(schedule, args, trial_global_index, flash_csv_dir):
+    trial_global_index += 1
+    trial_start_wall_time = time.time()
+    spec = schedule.current_spec()
+    duration = current_trial_duration_sec(schedule, args)
+    active_meta = build_metadata(
+        spec, trial_global_index, trial_start_wall_time, duration, flash_csv_dir
+    )
+    return trial_global_index, trial_start_wall_time, active_meta
 
 
 def main():
@@ -228,85 +259,74 @@ def main():
     if args.log_file:
         os.makedirs(os.path.dirname(os.path.abspath(args.log_file)), exist_ok=True)
 
-    recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    recv_sock.bind((UDP_IP, BOUNDARY_PORT))
-    recv_sock.setblocking(False)
-
     send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    send_addr = (UDP_IP, TRIAL_META_PORT)
+    send_addrs = [
+        (UDP_IP, TRIAL_META_PORT),
+        (UDP_IP, CALC_PATH_META_PORT),
+    ]
 
-    teleport_count = 0
     trial_start_wall_time = time.time()
     trial_global_index = 1
     spec = schedule.current_spec()
+    trial_duration_sec = current_trial_duration_sec(schedule, args)
     active_meta = build_metadata(
-        spec, trial_global_index, trial_start_wall_time, teleport_count, args.flash_csv_dir, args
+        spec, trial_global_index, trial_start_wall_time, trial_duration_sec, args.flash_csv_dir
     )
 
-    maybe_log(args.log_file, f"Coordinator started; {n_trials} trials scheduled.")
+    maybe_log(args.log_file, f"Coordinator started; {n_trials} trials scheduled (time-driven).")
     maybe_log(
         args.log_file,
         format_trial_status(
             active_meta,
-            note=trial_progress_note(trial_global_index, teleport_count, initial=True),
+            note=trial_progress_note(trial_global_index, initial=True),
         ),
     )
 
     payload0 = json.dumps(active_meta).encode("utf-8")
-    send_sock.sendto(payload0, send_addr)
+    for addr in send_addrs:
+        send_sock.sendto(payload0, addr)
     last_sent = time.time()
 
     finished = False
     while not finished:
         now = time.time()
 
-        try:
-            while True:
-                data, _addr = recv_sock.recvfrom(4096)
-                event = json.loads(data.decode("utf-8"))
-                if event.get("event") != "teleport_boundary":
-                    continue
-
-                teleport_count = int(event.get("teleport_count", teleport_count + 1))
-                if not schedule.advance_after_boundary():
-                    maybe_log(
-                        args.log_file,
-                        f"Schedule complete after {n_trials} trials "
-                        f"(final teleport_count={teleport_count}); exiting.",
-                    )
-                    finished = True
-                    break
-
-                trial_global_index += 1
-                trial_start_wall_time = time.time()
-                spec = schedule.current_spec()
-                active_meta = build_metadata(
-                    spec, trial_global_index, trial_start_wall_time, teleport_count, args.flash_csv_dir, args
+        elapsed = now - trial_start_wall_time
+        if elapsed >= trial_duration_sec:
+            if not schedule.advance_trial():
+                maybe_log(
+                    args.log_file,
+                    f"Schedule complete after {n_trials} trials; exiting.",
                 )
+                finished = True
+            else:
+                trial_global_index, trial_start_wall_time, active_meta = advance_to_next_trial(
+                    schedule, args, trial_global_index, args.flash_csv_dir
+                )
+                trial_duration_sec = active_meta["trial_duration_sec"]
                 maybe_log(
                     args.log_file,
                     format_trial_status(
                         active_meta,
-                        note=trial_progress_note(trial_global_index, teleport_count),
+                        note=trial_progress_note(trial_global_index),
                     ),
                 )
                 payload = json.dumps(active_meta).encode("utf-8")
-                send_sock.sendto(payload, send_addr)
+                for addr in send_addrs:
+                    send_sock.sendto(payload, addr)
                 last_sent = now
-        except BlockingIOError:
-            pass
 
         if finished:
             break
 
         if (now - last_sent) >= args.meta_interval_sec:
             payload = json.dumps(active_meta).encode("utf-8")
-            send_sock.sendto(payload, send_addr)
+            for addr in send_addrs:
+                send_sock.sendto(payload, addr)
             last_sent = now
 
         time.sleep(0.01)
 
-    recv_sock.close()
     send_sock.close()
 
 

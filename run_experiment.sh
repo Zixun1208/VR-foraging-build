@@ -5,7 +5,12 @@ TRAINING_TRIALS_PER_ITERATION=1
 PROBING_TRIALS_PER_ITERATION=1
 OPENLOOP_TRAINING_ITERATIONS=0
 BASELINE_ITERATIONS=0
-PATH_LENGTH=130
+X_MIN=-100
+X_MAX=100
+Z_MIN=-100
+Z_MAX=100
+TRIAL_START_X=""
+TRIAL_START_Z=""
 OPENLOOP_ZONES="0:150,1:300"
 BASELINE_ZONES="0:none,1:none"
 TRAINING_ZONES="0:100,1:20"
@@ -17,7 +22,10 @@ MAX_AMPLITUDE_VOLTS=5.0
 MIN_AMPLITUDE_VOLTS=0.2
 FLASH_FREQUENCY_HZ=50.0
 DECAY_MODE="exp"
-TRIAL_START_Z=""
+TRAINING_SESSION_TIME_SEC=60
+BASELINE_SESSION_TIME_SEC=60
+PROBING_SESSION_TIME_SEC=60
+OPENLOOP_SESSION_TIME_SEC=60
 USE_FICTRAC_SIM=0
 
 while [[ "$#" -gt 0 ]]; do
@@ -27,7 +35,14 @@ while [[ "$#" -gt 0 ]]; do
         --probing-trials-per-iteration) PROBING_TRIALS_PER_ITERATION="$2"; shift ;;
         --baseline-iterations) BASELINE_ITERATIONS="$2"; shift ;;
         --openloop-training-iterations) OPENLOOP_TRAINING_ITERATIONS="$2"; shift ;;
-        --path-length) PATH_LENGTH="$2"; shift ;;
+        --openloop-session-time-sec) OPENLOOP_SESSION_TIME_SEC="$2"; shift ;;
+        --baseline-session-time-sec) BASELINE_SESSION_TIME_SEC="$2"; shift ;;
+        --training-session-time-sec) TRAINING_SESSION_TIME_SEC="$2"; shift ;;
+        --probing-session-time-sec) PROBING_SESSION_TIME_SEC="$2"; shift ;;
+        --x-min) X_MIN="$2"; shift ;;
+        --x-max) X_MAX="$2"; shift ;;
+        --z-min) Z_MIN="$2"; shift ;;
+        --z-max) Z_MAX="$2"; shift ;;
         --openloop-zones) OPENLOOP_ZONES="$2"; shift ;;
         --baseline-zones) BASELINE_ZONES="$2"; shift ;;
         --training-zones) TRAINING_ZONES="$2"; shift ;;
@@ -39,6 +54,7 @@ while [[ "$#" -gt 0 ]]; do
         --min-amplitude-volts) MIN_AMPLITUDE_VOLTS="$2"; shift ;;
         --flash-frequency-hz) FLASH_FREQUENCY_HZ="$2"; shift ;;
         --decay-mode) DECAY_MODE="$2"; shift ;;
+        --trial-start-x) TRIAL_START_X="$2"; shift ;;
         --trial-start-z) TRIAL_START_Z="$2"; shift ;;
         --use-fictrac-sim) USE_FICTRAC_SIM="$2"; shift ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
@@ -156,7 +172,7 @@ echo "Pre-flight checks passed." | tee -a "$SCRIPT_LOG"
 # ── End pre-flight ─────────────────────────────────────────────────
 
 ITER_TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-echo "Starting continuous teleport-driven experiment..." | tee -a "$SCRIPT_LOG"
+echo "Starting time-driven experiment..." | tee -a "$SCRIPT_LOG"
 
 cd "$FICTRAC_WORKING_DIR" || exit 1
 if [[ "$USE_FICTRAC_SIM" == "1" ]]; then
@@ -181,6 +197,10 @@ python3 "$coordinator_exe" \
     --baseline-zones "$BASELINE_ZONES" \
     --training-zones "$TRAINING_ZONES" \
     --probing-zones "$PROBING_ZONES" \
+    --openloop-session-time-sec "$OPENLOOP_SESSION_TIME_SEC" \
+    --baseline-session-time-sec "$BASELINE_SESSION_TIME_SEC" \
+    --training-session-time-sec "$TRAINING_SESSION_TIME_SEC" \
+    --probing-session-time-sec "$PROBING_SESSION_TIME_SEC" \
     --flash-csv-dir "$FLASH_CSV_DIR" \
     --log-file "$LOG_CONTINUOUS_DIR/trial_coordinator_${ITER_TIMESTAMP}.log" \
     > >(tee -a "$LOG_CONTINUOUS_DIR/trial_coordinator_stdout_${ITER_TIMESTAMP}.log") 2>&1 &
@@ -189,7 +209,16 @@ PIDS+=($COORDINATOR_PID)
 
 sleep 0.1
 
-calc_path_cmd=(python3 "$calc_path_exe" --path-length "$PATH_LENGTH")
+calc_path_cmd=(
+    python3 "$calc_path_exe"
+    --x-min "$X_MIN"
+    --x-max "$X_MAX"
+    --z-min "$Z_MIN"
+    --z-max "$Z_MAX"
+)
+if [[ -n "$TRIAL_START_X" ]]; then
+    calc_path_cmd+=(--trial-start-x "$TRIAL_START_X")
+fi
 if [[ -n "$TRIAL_START_Z" ]]; then
     calc_path_cmd+=(--trial-start-z "$TRIAL_START_Z")
 fi
@@ -215,7 +244,7 @@ PIDS+=($CON_LED_PID)
 UNITY_PID=$!
 PIDS+=($UNITY_PID)
 
-echo "Continuous run active. Trials advance on teleport boundaries; run ends when all trials complete." | tee -a "$SCRIPT_LOG"
+echo "Continuous run active. Trials advance on session timers; run ends when all trials complete." | tee -a "$SCRIPT_LOG"
 
 # ── Runtime component monitor ──────────────────────────────────────
 WARNED_FICTRAC=0
