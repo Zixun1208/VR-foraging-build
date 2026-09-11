@@ -5,10 +5,12 @@ import socket
 import time
 from datetime import datetime
 
+import ports
 
-UDP_IP = "127.0.0.1"
-BOUNDARY_PORT = 1321
-TRIAL_META_PORT = 1320
+
+UDP_IP = ports.UDP_IP
+BOUNDARY_PORT = ports.CALC_PATH_TO_COORDINATOR
+TRIAL_META_PORT = ports.COORDINATOR_TO_CON_LED
 
 
 def parse_args():

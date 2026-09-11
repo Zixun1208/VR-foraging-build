@@ -6,6 +6,8 @@ import time as _time
 import argparse
 from numba import jit
 
+import ports
+
 # Args
 parser = argparse.ArgumentParser(description="Integrate FicTrac motion and stream pose to Unity over UDP.")
 parser.add_argument(
@@ -17,13 +19,13 @@ parser.add_argument(
 parser.add_argument(
     "--boundary-ip",
     type=str,
-    default="127.0.0.1",
+    default=ports.UDP_IP,
     help="UDP IP used to publish teleport boundary events.",
 )
 parser.add_argument(
     "--boundary-port",
     type=int,
-    default=1321,
+    default=ports.CALC_PATH_TO_COORDINATOR,
     help="UDP port used to publish teleport boundary events.",
 )
 parser.add_argument(
@@ -36,9 +38,9 @@ args = parser.parse_args()
 
 # UDP socket setup
 recv_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-recv_socket.bind(("127.0.0.1", 1317))  # Listen here
+recv_socket.bind((ports.UDP_IP, ports.FICTRAC_TO_CALC_PATH))  # Listen here
 send_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-send_addr = ("127.0.0.1", 1318)  # Send updated position here
+send_addr = (ports.UDP_IP, ports.CALC_PATH_TO_UNITY)  # Send updated position here
 boundary_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 boundary_addr = (args.boundary_ip, args.boundary_port)
 

@@ -151,6 +151,14 @@ if [[ "$preflight_ok" -eq 0 ]]; then
     exit 1
 fi
 
+# A port still bound means a process from a previous run survived; it would eat
+# the packets this run expects and the session would record nothing.
+echo "Checking UDP ports are free..." | tee -a "$SCRIPT_LOG"
+if ! python3 "$SCRIPT_DIR/ports.py" 2>&1 | tee -a "$SCRIPT_LOG"; then
+    echo "[PREFLIGHT ERROR] UDP ports unavailable — aborting." | tee -a "$SCRIPT_LOG"
+    exit 1
+fi
+
 echo "Running DAQ pre-flight probe for AO channel '$AO_CHANNEL'..." | tee -a "$SCRIPT_LOG"
 daq_probe_output=$(python3 "$con_led_exe" --check-daq \
     --ao-channel "$AO_CHANNEL" \

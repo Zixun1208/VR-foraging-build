@@ -13,6 +13,7 @@ import json
 from nidaqmx.system import System
 
 import experiment_defaults
+import ports
 
 # Constants. Values that also appear in experiment_defaults.json are read from
 # there so this module cannot drift from run_experiment.sh and the GUI; the
@@ -24,9 +25,9 @@ DEFAULT_ZONES = experiment_defaults.get("training_zones", "0:150,1:none")
 DEFAULT_DECAY_MODE = experiment_defaults.get("decay_mode", "exp")
 DEFAULT_MAX_VOLTS_BY_ZONE = experiment_defaults.zone_volt_default("max", "0:5.0,1:5.0")
 DEFAULT_MIN_VOLTS_BY_ZONE = experiment_defaults.zone_volt_default("min", "0:0.2,1:0.2")
-UDP_IP = "127.0.0.1"
-UDP_PORT = 1319
-TRIAL_META_PORT = 1320
+UDP_IP = ports.UDP_IP
+UDP_PORT = ports.UNITY_TO_CON_LED
+TRIAL_META_PORT = ports.COORDINATOR_TO_CON_LED
 
 # Exit codes for --check-daq, consumed by run_experiment.sh pre-flight.
 EXIT_OK = 0
