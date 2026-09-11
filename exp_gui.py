@@ -14,6 +14,7 @@ from time import monotonic
 from typing import Any
 
 from local_file_picker import local_file_picker
+from log_markers import ERROR_MARKERS, WARNING_MARKERS
 from nicegui import app, ui
 
 process: subprocess.Popen[str] | None = None
@@ -289,6 +290,25 @@ def main_page() -> None:
         start_btn.enable()
         stop_btn.disable()
 
+    notified_alerts: set[str] = set()
+
+    def notify_alert(text: str) -> None:
+        """Raise a sticky notification for a marked line, once per distinct message.
+
+        A component that keeps logging the same failure must not bury the screen
+        in undismissable toasts.
+        """
+        if any(marker in text for marker in ERROR_MARKERS):
+            kind = "negative"
+        elif any(marker in text for marker in WARNING_MARKERS):
+            kind = "warning"
+        else:
+            return
+        if text in notified_alerts:
+            return
+        notified_alerts.add(text)
+        ui.notify(text, type=kind, close_button=True, timeout=0)
+
     def drain_log() -> None:
         nonlocal latest_pos_text, last_pos_ui_update
         try:
@@ -313,10 +333,7 @@ def main_page() -> None:
                         continue
 
                     experiment_log.push(text)
-                    if "[PREFLIGHT ERROR]" in text or "[COMPONENT ERROR]" in text:
-                        ui.notify(text, type="negative", close_button=True, timeout=0)
-                    elif "[COMPONENT WARNING]" in text:
-                        ui.notify(text, type="warning", close_button=True, timeout=0)
+                    notify_alert(text)
         except queue.Empty:
             pass
         now = monotonic()
@@ -329,6 +346,7 @@ def main_page() -> None:
     def run_experiment() -> None:
         global process
         nonlocal latest_pos_text, last_pos_ui_update
+        notified_alerts.clear()
         _sync_paths_from_ui()
         baseline_iterations = paths["baseline_iterations"]
         iterations = paths["iterations"]

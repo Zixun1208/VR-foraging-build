@@ -1,4 +1,8 @@
 #!/bin/bash
+# Unset variables and failing pipeline stages are bugs, not silent no-ops.
+# `errexit` is deliberately omitted: the cleanup trap and explicit checks
+# below handle failures, and background job management interacts badly with it.
+set -uo pipefail
 
 ITERATIONS=15
 TRAINING_TRIALS_PER_ITERATION=1
@@ -19,6 +23,7 @@ FLASH_FREQUENCY_HZ=50.0
 DECAY_MODE="exp"
 TRIAL_START_Z=""
 USE_FICTRAC_SIM=0
+ABORT_ON_COMPONENT_FAILURE=1
 
 while [[ "$#" -gt 0 ]]; do
     case $1 in
@@ -41,6 +46,7 @@ while [[ "$#" -gt 0 ]]; do
         --decay-mode) DECAY_MODE="$2"; shift ;;
         --trial-start-z) TRIAL_START_Z="$2"; shift ;;
         --use-fictrac-sim) USE_FICTRAC_SIM="$2"; shift ;;
+        --abort-on-component-failure) ABORT_ON_COMPONENT_FAILURE="$2"; shift ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
@@ -127,7 +133,15 @@ check_file() {
     fi
 }
 
-check_file "Unity executable"    "$UNITY_EXE"
+check_exe() {
+    local label="$1" path="$2"
+    if [[ ! -x "$path" ]]; then
+        echo "[PREFLIGHT ERROR] $label not found or not executable: $path" | tee -a "$SCRIPT_LOG"
+        preflight_ok=0
+    fi
+}
+
+check_exe  "Unity executable"    "$UNITY_EXE"
 check_file "calc_path.py"        "$calc_path_exe"
 check_file "con_led.py"          "$con_led_exe"
 check_file "trial_coordinator"   "$coordinator_exe"
@@ -135,7 +149,7 @@ check_file "trial_coordinator"   "$coordinator_exe"
 if [[ "$USE_FICTRAC_SIM" == "1" ]]; then
     check_file "FicTrac sim stub" "$FICTRAC_SIM_EXE"
 else
-    check_file "FicTrac executable" "$FICTRAC_EXE"
+    check_exe  "FicTrac executable" "$FICTRAC_EXE"
     check_file "FicTrac config"     "$FICTRAC_CONFIG"
 fi
 
@@ -145,13 +159,23 @@ if [[ "$preflight_ok" -eq 0 ]]; then
 fi
 
 echo "Running DAQ pre-flight probe for AO channel '$AO_CHANNEL'..." | tee -a "$SCRIPT_LOG"
-daq_probe_output=$(python3 "$con_led_exe" --check-daq --ao-channel "$AO_CHANNEL" 2>&1)
+daq_probe_output=$(python3 "$con_led_exe" --check-daq \
+    --ao-channel "$AO_CHANNEL" \
+    --max-amplitude-volts-by-zone "$MAX_AMPLITUDE_VOLTS_BY_ZONE" \
+    --min-amplitude-volts-by-zone "$MIN_AMPLITUDE_VOLTS_BY_ZONE" \
+    --max-amplitude-volts "$MAX_AMPLITUDE_VOLTS" \
+    --min-amplitude-volts "$MIN_AMPLITUDE_VOLTS" \
+    --zones "$TRAINING_ZONES" \
+    --decay-mode "$DECAY_MODE" 2>&1)
 daq_probe_rc=$?
 echo "$daq_probe_output" | tee -a "$SCRIPT_LOG"
-if [[ "$daq_probe_rc" -ne 0 ]]; then
-    echo "[PREFLIGHT ERROR] DAQ/AO device unavailable for $AO_CHANNEL — aborting." | tee -a "$SCRIPT_LOG"
-    exit 1
-fi
+case "$daq_probe_rc" in
+    0) ;;
+    2)  echo "[PREFLIGHT ERROR] con_led rejected the experiment parameters — aborting." | tee -a "$SCRIPT_LOG"
+        exit 1 ;;
+    *)  echo "[PREFLIGHT ERROR] DAQ/AO device unavailable for $AO_CHANNEL — aborting." | tee -a "$SCRIPT_LOG"
+        exit 1 ;;
+esac
 echo "Pre-flight checks passed." | tee -a "$SCRIPT_LOG"
 # ── End pre-flight ─────────────────────────────────────────────────
 
@@ -218,30 +242,51 @@ PIDS+=($UNITY_PID)
 echo "Continuous run active. Trials advance on teleport boundaries; run ends when all trials complete." | tee -a "$SCRIPT_LOG"
 
 # ── Runtime component monitor ──────────────────────────────────────
-WARNED_FICTRAC=0
-WARNED_CALC_PATH=0
-WARNED_CON_LED=0
-WARNED_UNITY=0
+# Components are polled rather than waited on because the run ends with the
+# coordinator; any other component dying means the remaining trials would
+# record data with a missing signal chain, so by default we abort.
+declare -A COMPONENT_PIDS=(
+    [FicTrac]="$FICTRAC_PID"
+    [calc_path]="$CALC_PATH_PID"
+    [con_led]="$CON_LED_PID"
+    [Unity]="$UNITY_PID"
+)
+declare -A COMPONENT_DESC=(
+    [FicTrac]="ball tracking stopped"
+    [calc_path]="path integration stopped"
+    [con_led]="DAQ/LED output stopped"
+    [Unity]="VR rendering stopped"
+)
+declare -A COMPONENT_REPORTED=()
 
+run_status=0
 while kill -0 "$COORDINATOR_PID" 2>/dev/null; do
-    if [[ "$WARNED_FICTRAC" -eq 0 ]] && ! kill -0 "$FICTRAC_PID" 2>/dev/null; then
-        echo "[COMPONENT ERROR] FicTrac exited unexpectedly (ball tracking stopped)." | tee -a "$SCRIPT_LOG"
-        WARNED_FICTRAC=1
-    fi
-    if [[ "$WARNED_CALC_PATH" -eq 0 ]] && ! kill -0 "$CALC_PATH_PID" 2>/dev/null; then
-        echo "[COMPONENT ERROR] calc_path exited unexpectedly (path integration stopped)." | tee -a "$SCRIPT_LOG"
-        WARNED_CALC_PATH=1
-    fi
-    if [[ "$WARNED_CON_LED" -eq 0 ]] && ! kill -0 "$CON_LED_PID" 2>/dev/null; then
-        echo "[COMPONENT ERROR] con_led exited unexpectedly (DAQ/LED output stopped)." | tee -a "$SCRIPT_LOG"
-        WARNED_CON_LED=1
-    fi
-    if [[ "$WARNED_UNITY" -eq 0 ]] && ! kill -0 "$UNITY_PID" 2>/dev/null; then
-        echo "[COMPONENT ERROR] Unity exited unexpectedly (VR rendering stopped)." | tee -a "$SCRIPT_LOG"
-        WARNED_UNITY=1
-    fi
+    for name in "${!COMPONENT_PIDS[@]}"; do
+        [[ -n "${COMPONENT_REPORTED[$name]:-}" ]] && continue
+        kill -0 "${COMPONENT_PIDS[$name]}" 2>/dev/null && continue
+
+        COMPONENT_REPORTED[$name]=1
+        wait "${COMPONENT_PIDS[$name]}" 2>/dev/null
+        component_rc=$?
+        echo "[COMPONENT ERROR] $name exited unexpectedly with status $component_rc (${COMPONENT_DESC[$name]})." \
+            | tee -a "$SCRIPT_LOG"
+        if [[ "$ABORT_ON_COMPONENT_FAILURE" == "1" ]]; then
+            echo "[COMPONENT ERROR] Aborting run: remaining trials would be recorded without $name." \
+                | tee -a "$SCRIPT_LOG"
+            run_status=1
+        fi
+    done
+    [[ "$run_status" -ne 0 ]] && break
     sleep 1
 done
-wait "$COORDINATOR_PID"
+
+if [[ "$run_status" -eq 0 ]]; then
+    wait "$COORDINATOR_PID"
+    run_status=$?
+    if [[ "$run_status" -ne 0 ]]; then
+        echo "[COMPONENT ERROR] Trial coordinator exited with status $run_status." | tee -a "$SCRIPT_LOG"
+    fi
+fi
 # ── End runtime monitor ────────────────────────────────────────────
 
+exit "$run_status"

@@ -20,6 +20,11 @@ UDP_IP = "127.0.0.1"
 UDP_PORT = 1319
 TRIAL_META_PORT = 1320
 
+# Exit codes for --check-daq, consumed by run_experiment.sh pre-flight.
+EXIT_OK = 0
+EXIT_DAQ_UNAVAILABLE = 1
+EXIT_BAD_CONFIG = 2
+
 def parse_zone_volt_map(spec: str) -> dict[int, float]:
     """Parse '0:5.0,1:3.0' into {0: 5.0, 1: 3.0}. Whitespace around tokens is ignored."""
     result: dict[int, float] = {}
@@ -133,29 +138,56 @@ parser.add_argument(
 parser.add_argument(
     "--check-daq",
     action="store_true",
-    help="Probe the DAQ AO channel and exit 0 (ok) or 1 (unavailable). No sockets or tasks are created.",
+    help=("Reserve the DAQ AO channel, write 0V, release it, then exit. "
+          f"Exit {EXIT_OK} (ok), {EXIT_DAQ_UNAVAILABLE} (DAQ unavailable), "
+          f"{EXIT_BAD_CONFIG} (invalid arguments). No sockets are created."),
 )
-args = parser.parse_args()
-
-zone_max_amp = parse_zone_volt_map(args.max_amplitude_volts_by_zone)
-zone_min_amp = parse_zone_volt_map(args.min_amplitude_volts_by_zone)
-if args.min_amplitude_volts <= 0.0:
-    raise ValueError("--min-amplitude-volts must be > 0")
-if args.max_amplitude_volts <= args.min_amplitude_volts:
-    raise ValueError("--max-amplitude-volts must be greater than --min-amplitude-volts")
-
-daq_max_volt = args.max_amplitude_volts
-if zone_max_amp:
-    daq_max_volt = max(daq_max_volt, max(zone_max_amp.values()))
-
-default_zone_decay_constants = parse_zone_decay_rates(
-    args.zones,
-    args.decay_mode,
-    zone_max_amp,
-    zone_min_amp,
-    args.max_amplitude_volts,
-    args.min_amplitude_volts,
+parser.add_argument(
+    "--allow-ao-fallback",
+    action="store_true",
+    help=("If the requested AO channel is absent, use the first available one instead of failing. "
+          "Off by default: on a rig, silently driving a different physical output is worse than aborting."),
 )
+
+args = None
+zone_max_amp: dict[int, float] = {}
+zone_min_amp: dict[int, float] = {}
+daq_max_volt = 0.0
+default_zone_decay_constants: dict[int, float | None] = {}
+
+
+def configure(argv=None):
+    """Parse and validate arguments into module state.
+
+    Kept out of import time so this module can be imported by tests and tools
+    without parsing sys.argv or raising on someone else's command line.
+    Raises ValueError on an invalid configuration.
+    """
+    global args, zone_max_amp, zone_min_amp, daq_max_volt, default_zone_decay_constants
+
+    args = parser.parse_args(argv)
+
+    zone_max_amp = parse_zone_volt_map(args.max_amplitude_volts_by_zone)
+    zone_min_amp = parse_zone_volt_map(args.min_amplitude_volts_by_zone)
+    if args.min_amplitude_volts <= 0.0:
+        raise ValueError("--min-amplitude-volts must be > 0")
+    if args.max_amplitude_volts <= args.min_amplitude_volts:
+        raise ValueError("--max-amplitude-volts must be greater than --min-amplitude-volts")
+
+    daq_max_volt = args.max_amplitude_volts
+    if zone_max_amp:
+        daq_max_volt = max(daq_max_volt, max(zone_max_amp.values()))
+
+    default_zone_decay_constants = parse_zone_decay_rates(
+        args.zones,
+        args.decay_mode,
+        zone_max_amp,
+        zone_min_amp,
+        args.max_amplitude_volts,
+        args.min_amplitude_volts,
+    )
+    return args
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 warnings.filterwarnings("ignore", category=UserWarning, module="nidaqmx")
@@ -186,7 +218,12 @@ def get_available_ao_channels():
     return channels
 
 
-def resolve_ao_channel(requested_channel):
+def resolve_ao_channel(requested_channel, allow_fallback=False):
+    """Return the AO channel to drive, or raise RuntimeError if it is unavailable.
+
+    Falling back to a different physical output sends voltage somewhere the
+    experimenter did not ask for, so it must be requested explicitly.
+    """
     available_channels = get_available_ao_channels()
     logging.info(
         "Detected AO channels: %s",
@@ -196,19 +233,46 @@ def resolve_ao_channel(requested_channel):
     if requested_channel in available_channels:
         return requested_channel
 
-    if available_channels:
-        fallback_channel = available_channels[0]
-        logging.warning(
-            "Requested AO channel '%s' not found. Falling back to '%s'.",
-            requested_channel,
-            fallback_channel,
+    if not available_channels:
+        raise RuntimeError(
+            "No NI-DAQmx AO channels detected. Ensure the AO module is powered, seated, "
+            "and visible in NI-DAQmx before starting."
         )
-        return fallback_channel
 
-    raise RuntimeError(
-        "No NI-DAQmx AO channels detected. Ensure the AO module is powered, seated, "
-        "and visible in NI-DAQmx before starting."
+    if not allow_fallback:
+        raise RuntimeError(
+            f"Requested AO channel '{requested_channel}' not found. Available: "
+            f"{', '.join(available_channels)}. Fix --ao-channel, or pass "
+            f"--allow-ao-fallback to accept a substitute."
+        )
+
+    fallback_channel = available_channels[0]
+    logging.warning(
+        "Requested AO channel '%s' not found. Falling back to '%s'.",
+        requested_channel,
+        fallback_channel,
     )
+    return fallback_channel
+
+
+def probe_ao_channel(requested_channel, max_volt, allow_fallback=False):
+    """Reserve the AO channel and write 0V, proving it is usable right now.
+
+    Enumeration alone does not catch the common failure of the device being
+    held by a leftover process from a crashed run.
+    """
+    channel = resolve_ao_channel(requested_channel, allow_fallback=allow_fallback)
+    try:
+        with nidaqmx.Task() as task:
+            task.ao_channels.add_ao_voltage_chan(channel, min_val=0.0, max_val=max_volt)
+            task.start()
+            task.write(0.0)
+    except Exception as exc:
+        raise RuntimeError(
+            f"AO channel '{channel}' exists but could not be reserved: {exc}. "
+            "A previous run may still hold the device."
+        ) from exc
+    return channel
 
 def reset_flash_state(current_time):
     return False, current_time, None, current_time
@@ -278,7 +342,7 @@ def udp_daq_control():
 
     csv_file, csv_writer = open_csv(active_csv_path)
 
-    resolved_ao_channel = resolve_ao_channel(args.ao_channel)
+    resolved_ao_channel = resolve_ao_channel(args.ao_channel, allow_fallback=args.allow_ao_fallback)
 
     with nidaqmx.Task() as task:
         task.ao_channels.add_ao_voltage_chan(
@@ -453,15 +517,22 @@ def udp_daq_control():
                 logging.info(f"Flash CSV closed: {active_csv_path}")
 
 if __name__ == "__main__":
+    try:
+        configure()
+    except ValueError as exc:
+        print(f"[PREFLIGHT ERROR] Invalid configuration: {exc}")
+        sys.exit(EXIT_BAD_CONFIG)
+
     if args.check_daq:
-        logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
         try:
-            ch = resolve_ao_channel(args.ao_channel)
-            print(f"[PREFLIGHT OK] DAQ AO channel ready: {ch}")
-            sys.exit(0)
+            ch = probe_ao_channel(args.ao_channel, daq_max_volt, allow_fallback=args.allow_ao_fallback)
         except RuntimeError as exc:
             print(f"[PREFLIGHT ERROR] {exc}")
-            sys.exit(1)
+            sys.exit(EXIT_DAQ_UNAVAILABLE)
+        if ch != args.ao_channel:
+            print(f"[PREFLIGHT WARNING] Using substitute AO channel '{ch}' (requested '{args.ao_channel}')")
+        print(f"[PREFLIGHT OK] DAQ AO channel ready: {ch}")
+        sys.exit(EXIT_OK)
 
     signal.signal(signal.SIGTERM, request_shutdown)
     signal.signal(signal.SIGINT, request_shutdown)
