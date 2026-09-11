@@ -105,6 +105,25 @@ port still bound means a process from a previous run survived and would silently
 eat the packets the new run expects — a session that records nothing. Find the
 culprit with `lsof -iUDP:<port>`.
 
+## Analysis
+
+`analysis/foraging_preprocess/` turns one rig acquisition (the continuous
+`unity/CameraLog_*.csv` plus `flash_events/` this repo writes under
+`csv_main_dir`) into per-trial trajectory CSVs, runs QC on them, and
+recommends which trials to keep. It reads this repo's own
+`experiment_config.json` as the authority on the task, so the two stay in
+sync automatically.
+
+```bash
+cd analysis/foraging_preprocess
+python preprocess.py --acquisition 20260810_153938        # one session
+python preprocess.py --batch --date 2026-09-11            # a whole day
+```
+
+It is self-contained (numpy + matplotlib only, no install) and safe to copy
+to a rig machine on its own — see `analysis/foraging_preprocess/README.md`
+for the full step/flag/threshold reference.
+
 ## License
 
 See [LICENSE](LICENSE) (MIT).
