@@ -14,11 +14,15 @@ from time import monotonic
 from typing import Any
 
 from local_file_picker import local_file_picker
+from experiment_defaults import load_defaults
 from log_markers import ERROR_MARKERS, WARNING_MARKERS
 from nicegui import app, ui
 
 process: subprocess.Popen[str] | None = None
 
+# Machine-specific paths default to empty and are filled from the GUI's working
+# config; experiment parameters come from the shared defaults file so the GUI and
+# run_experiment.sh always start from the same protocol.
 paths: dict[str, str] = {
     "bash_script": "",
     "unity_exe": "",
@@ -29,24 +33,7 @@ paths: dict[str, str] = {
     "openloop_sim_py": "",
     "working_dir": "",
     "csv_main_dir": "",
-    "openloop_training_iterations": "0",
-    "baseline_iterations": "0",
-    "iterations": "15",
-    "training_trials_per_iteration": "1",
-    "probing_trials_per_iteration": "1",
-    "path_length": "130",
-    "openloop_zones": "0:150,1:300",
-    "baseline_zones": "0:none,1:none",
-    "training_zones": "0:100,1:20",
-    "probing_zones": "0:none,1:none",
-    "ao_channel": "cDAQ1Mod2/ao0",
-    "zone0_max_volts": "5.0",
-    "zone0_min_volts": "0.2",
-    "zone1_max_volts": "5.0",
-    "zone1_min_volts": "0.2",
-    "flash_freq_hz": "50.0",
-    "decay_mode": "exp",
-    "trial_start_z": "",
+    **load_defaults(),
 }
 
 FILE_FIELDS: list[tuple[str, str, bool]] = [

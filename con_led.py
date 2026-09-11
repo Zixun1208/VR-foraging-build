@@ -12,10 +12,18 @@ from math import log, exp
 import json
 from nidaqmx.system import System
 
-# Constants
-FLASH_FREQUENCY = 50.0
+import experiment_defaults
+
+# Constants. Values that also appear in experiment_defaults.json are read from
+# there so this module cannot drift from run_experiment.sh and the GUI; the
+# literals are only the fallback for a standalone run without that file.
 FLASH_ON_DURATION_SEC = 0.001
-DEFAULT_DAQ_AO_CHANNEL = "cDAQ1Mod2/ao0"
+FLASH_FREQUENCY = experiment_defaults.get_float("flash_freq_hz", 50.0)
+DEFAULT_DAQ_AO_CHANNEL = experiment_defaults.get("ao_channel", "cDAQ1Mod2/ao0")
+DEFAULT_ZONES = experiment_defaults.get("training_zones", "0:150,1:none")
+DEFAULT_DECAY_MODE = experiment_defaults.get("decay_mode", "exp")
+DEFAULT_MAX_VOLTS_BY_ZONE = experiment_defaults.zone_volt_default("max", "0:5.0,1:5.0")
+DEFAULT_MIN_VOLTS_BY_ZONE = experiment_defaults.zone_volt_default("min", "0:0.2,1:0.2")
 UDP_IP = "127.0.0.1"
 UDP_PORT = 1319
 TRIAL_META_PORT = 1320
@@ -85,7 +93,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "--zones",
     type=str,
-    default="0:150,1:none",
+    default=DEFAULT_ZONES,
     help=("Comma-separated list of zone:decay_seconds pairs (e.g., '0:150,1:none'). "
           "Defines how long (in seconds) it takes to decay from max amplitude to min amplitude. "
           "Use 'none' to disable reward output for a zone. Use '0' to disable decay and keep constant max amplitude.")
@@ -100,13 +108,13 @@ parser.add_argument("--ao-channel", type=str, default=DEFAULT_DAQ_AO_CHANNEL, he
 parser.add_argument(
     "--max-amplitude-volts-by-zone",
     type=str,
-    default="0:5.0,1:5.0",
+    default=DEFAULT_MAX_VOLTS_BY_ZONE,
     help="Comma-separated zone:max_V pairs (e.g. '0:5.0,1:3.0'). Per-zone pulse amplitude at decay start.",
 )
 parser.add_argument(
     "--min-amplitude-volts-by-zone",
     type=str,
-    default="0:0.2,1:0.2",
+    default=DEFAULT_MIN_VOLTS_BY_ZONE,
     help="Comma-separated zone:min_V pairs. Per-zone floor during decay.",
 )
 parser.add_argument(
@@ -131,7 +139,7 @@ parser.add_argument(
 parser.add_argument(
     "--decay-mode",
     type=str,
-    default="exp",
+    default=DEFAULT_DECAY_MODE,
     choices=["exp", "linear"],
     help="Decay profile for amplitude vs elapsed time in zone.",
 )

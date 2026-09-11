@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 .cursor/
 test_tools/
+
+# Per-machine GUI working config; shipped defaults live in experiment_defaults.json
+experiment_config.json

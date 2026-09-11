@@ -4,24 +4,17 @@
 # below handle failures, and background job management interacts badly with it.
 set -uo pipefail
 
-ITERATIONS=15
-TRAINING_TRIALS_PER_ITERATION=1
-PROBING_TRIALS_PER_ITERATION=1
-OPENLOOP_TRAINING_ITERATIONS=0
-BASELINE_ITERATIONS=0
-PATH_LENGTH=130
-OPENLOOP_ZONES="0:150,1:300"
-BASELINE_ZONES="0:none,1:none"
-TRAINING_ZONES="0:100,1:20"
-PROBING_ZONES="0:none,1:none"
-AO_CHANNEL="cDAQ1Mod2/ao0"
-MAX_AMPLITUDE_VOLTS_BY_ZONE="0:5.0,1:5.0"
-MIN_AMPLITUDE_VOLTS_BY_ZONE="0:0.2,1:0.2"
-MAX_AMPLITUDE_VOLTS=5.0
-MIN_AMPLITUDE_VOLTS=0.2
-FLASH_FREQUENCY_HZ=50.0
-DECAY_MODE="exp"
-TRIAL_START_Z=""
+# Parameter defaults come from experiment_defaults.json via experiment_defaults.py,
+# so the shell script, the GUI and con_led cannot drift apart. CLI flags below
+# override them.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+defaults_shell=$(python3 "$SCRIPT_DIR/experiment_defaults.py" --shell) || {
+    echo "[PREFLIGHT ERROR] Could not load experiment_defaults.json — aborting." >&2
+    exit 1
+}
+eval "$defaults_shell"
+unset defaults_shell
+
 USE_FICTRAC_SIM=0
 ABORT_ON_COMPONENT_FAILURE=1
 
