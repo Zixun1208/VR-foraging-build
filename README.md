@@ -76,7 +76,12 @@ While a session runs, each component is monitored. If FicTrac, `calc_path`,
 with a missing signal chain — `--abort-on-component-failure 0` reverts to
 warn-only.
 
-Logs and per-trial stdout/stderr land under the session working directory (see `run_experiment.sh` for `logs/` layout). Raw CSV outputs are written under the configured `csv_main_dir` tree.
+A run is one continuous session, so each component writes one log for the whole
+run: they land flat in `<working_dir>/<timestamp>/logs/` with no per-phase or
+per-trial subdirectories. That log directory is the only thing created before
+pre-flight; the FicTrac working directory and the raw CSV directories are
+created only once pre-flight passes, so an aborted launch leaves no empty tree
+behind. Raw CSV outputs are written under the configured `csv_main_dir` tree.
 
 ## UDP ports — a frozen wire protocol
 

@@ -63,22 +63,12 @@ LOG_DIR="$WORKING_DIR/logs"
 FLASH_CSV_DIR="$RAW_CSV_MAIN_DIR/${TIMESTAMP}/flash_events"
 UNITY_CSV_DIR="$RAW_CSV_MAIN_DIR/${TIMESTAMP}/unity"
 
-LOG_BASELINE_DIR="$LOG_DIR/baseline"
-LOG_TRAINING_DIR="$LOG_DIR/training"
-LOG_PROBING_DIR="$LOG_DIR/probing"
-LOG_OPENLOOP_TRAINING_DIR="$LOG_DIR/openloop_training"
-LOG_CONTINUOUS_DIR="$LOG_DIR/continuous"
-
-mkdir -p "$WORKING_DIR" "$FICTRAC_WORKING_DIR" \
-         "$LOG_BASELINE_DIR" "$LOG_TRAINING_DIR" "$LOG_PROBING_DIR" "$LOG_OPENLOOP_TRAINING_DIR" "$LOG_CONTINUOUS_DIR" \
-         "$FLASH_CSV_DIR" "$UNITY_CSV_DIR"
-
-for ((i=1; i<=OPENLOOP_TRAINING_ITERATIONS; i++)); do mkdir -p "$LOG_OPENLOOP_TRAINING_DIR/iter_${i}"; done
-for ((i=1; i<=BASELINE_ITERATIONS; i++)); do mkdir -p "$LOG_BASELINE_DIR/iter_${i}"; done
-for ((iter=1; iter<=ITERATIONS; iter++)); do
-    for ((t=1; t<=TRAINING_TRIALS_PER_ITERATION; t++)); do mkdir -p "$LOG_TRAINING_DIR/iter_${iter}_trial_${t}"; done
-    for ((p=1; p<=PROBING_TRIALS_PER_ITERATION; p++)); do mkdir -p "$LOG_PROBING_DIR/iter_${iter}_trial_${p}"; done
-done
+# The run is one continuous session: every component writes a single log for the
+# whole run, so there is nothing to put in per-phase or per-trial directories.
+# Only the log directory is created up front, because pre-flight logs into it.
+# The data directories are created after pre-flight passes, so an aborted launch
+# does not leave a tree of empty session directories behind.
+mkdir -p "$LOG_DIR"
 
 SCRIPT_LOG="$LOG_DIR/run_experiment_${TIMESTAMP}.log"
 PIDS=()
@@ -178,6 +168,8 @@ case "$daq_probe_rc" in
         exit 1 ;;
 esac
 echo "Pre-flight checks passed." | tee -a "$SCRIPT_LOG"
+
+mkdir -p "$FICTRAC_WORKING_DIR" "$FLASH_CSV_DIR" "$UNITY_CSV_DIR"
 # ── End pre-flight ─────────────────────────────────────────────────
 
 ITER_TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
@@ -185,9 +177,9 @@ echo "Starting continuous teleport-driven experiment..." | tee -a "$SCRIPT_LOG"
 
 cd "$FICTRAC_WORKING_DIR" || exit 1
 if [[ "$USE_FICTRAC_SIM" == "1" ]]; then
-    python3 "$FICTRAC_SIM_EXE" >> "$LOG_CONTINUOUS_DIR/fictrac_${ITER_TIMESTAMP}.log" 2>&1 &
+    python3 "$FICTRAC_SIM_EXE" >> "$LOG_DIR/fictrac_${ITER_TIMESTAMP}.log" 2>&1 &
 else
-    "$FICTRAC_EXE" "$FICTRAC_CONFIG" >> "$LOG_CONTINUOUS_DIR/fictrac_${ITER_TIMESTAMP}.log" 2>&1 &
+    "$FICTRAC_EXE" "$FICTRAC_CONFIG" >> "$LOG_DIR/fictrac_${ITER_TIMESTAMP}.log" 2>&1 &
 fi
 FICTRAC_PID=$!
 PIDS+=($FICTRAC_PID)
@@ -207,8 +199,8 @@ python3 "$coordinator_exe" \
     --training-zones "$TRAINING_ZONES" \
     --probing-zones "$PROBING_ZONES" \
     --flash-csv-dir "$FLASH_CSV_DIR" \
-    --log-file "$LOG_CONTINUOUS_DIR/trial_coordinator_${ITER_TIMESTAMP}.log" \
-    > >(tee -a "$LOG_CONTINUOUS_DIR/trial_coordinator_stdout_${ITER_TIMESTAMP}.log") 2>&1 &
+    --log-file "$LOG_DIR/trial_coordinator_${ITER_TIMESTAMP}.log" \
+    > >(tee -a "$LOG_DIR/trial_coordinator_stdout_${ITER_TIMESTAMP}.log") 2>&1 &
 COORDINATOR_PID=$!
 PIDS+=($COORDINATOR_PID)
 
@@ -218,7 +210,7 @@ calc_path_cmd=(python3 "$calc_path_exe" --path-length "$PATH_LENGTH")
 if [[ -n "$TRIAL_START_Z" ]]; then
     calc_path_cmd+=(--trial-start-z "$TRIAL_START_Z")
 fi
-"${calc_path_cmd[@]}" > >(tee -a "$LOG_CONTINUOUS_DIR/calc_path_${ITER_TIMESTAMP}.log") 2>&1 &
+"${calc_path_cmd[@]}" > >(tee -a "$LOG_DIR/calc_path_${ITER_TIMESTAMP}.log") 2>&1 &
 CALC_PATH_PID=$!
 PIDS+=($CALC_PATH_PID)
 
@@ -232,11 +224,11 @@ python3 "$con_led_exe" \
     --flash-frequency-hz "$FLASH_FREQUENCY_HZ" \
     --decay-mode "$DECAY_MODE" \
     --csv-output "$FLASH_CSV_DIR/initial_training_iter_1_trial_1_${ITER_TIMESTAMP}.csv" \
-    > >(tee -a "$LOG_CONTINUOUS_DIR/con_led_${ITER_TIMESTAMP}.log") 2>&1 &
+    > >(tee -a "$LOG_DIR/con_led_${ITER_TIMESTAMP}.log") 2>&1 &
 CON_LED_PID=$!
 PIDS+=($CON_LED_PID)
 
-"$UNITY_EXE" --csvDirectory "$UNITY_CSV_DIR" >> "$LOG_CONTINUOUS_DIR/unity_${ITER_TIMESTAMP}.log" 2>&1 &
+"$UNITY_EXE" --csvDirectory "$UNITY_CSV_DIR" >> "$LOG_DIR/unity_${ITER_TIMESTAMP}.log" 2>&1 &
 UNITY_PID=$!
 PIDS+=($UNITY_PID)
 
