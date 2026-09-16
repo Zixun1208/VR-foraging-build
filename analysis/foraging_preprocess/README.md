@@ -213,10 +213,11 @@ as a hint, not applied as a rule.
 | `ingest.py` | acquisition folder → formatted session, FicTrac attach |
 | `qc.py` | per-trial metrics, keep/drop rules, the recommendation file |
 | `plots.py` | the four figure families |
-| `slicer.py` | vendored verbatim from `~/Analysis/slice_camera_log.py` |
+| `slicer.py` | corridor position -> per-trial CSVs; see [Slicing: why not by timestamp](#slicing-why-not-by-timestamp) |
 
-`slicer.py` is a copy. If the slicing logic changes upstream, re-copy it, or the two
-will drift.
+`slicer.py` started as a copy of `~/Analysis/slice_camera_log.py` but has since
+diverged on purpose (see below) and should now be treated as the canonical
+version — port the fix upstream if `~/Analysis` still needs to match.
 
 ## Figures
 
@@ -230,3 +231,45 @@ Written to `<session>/qc/`, per phase:
 `--figures-all-trials` includes the rejected ones. `--plots analysis` uses the
 `foraging` package from `--analysis-root` instead, so figures match that notebook
 exactly; it needs that package present.
+
+## Slicing: why not by timestamp
+
+A trial's sliced CSV should start with the fly at the corridor's beginning
+(position ~0) right after a teleport. An earlier version of `slicer.py` could
+instead produce a file that *starts* around position 100-130 and drops to ~0
+partway through — a few leftover rows, sometimes over a hundred, genuinely
+belonging to the *previous* trial.
+
+The cause was structural: that version cut the continuous camera log using
+wall-clock windows `[flash_event_time, next_flash_event_time)`, and
+`flash_event_time` comes from a different process's clock than the camera
+log's own timestamps. `trial_coordinator.py` stamps a new trial's start the
+instant it receives the `teleport_boundary` UDP message from `calc_path.py` —
+which fires *before* `calc_path.py` sends the corrected position to Unity for
+logging. In production data that declared timestamp has been measured up to
+~89 seconds earlier than the actual reset visible in the camera log, so the
+old window could start while the log was still recording the tail end of the
+fly finishing the previous trial.
+
+The fix: find the teleport directly in the camera log's own position column —
+a sharp drop from near the corridor's far end to near its start, which is a
+teleport full stop, independent of any other process's clock. Flash-event
+files still give each teleport-bounded row range its identity
+(phase/iteration/trial/output filename), matched by **order**, not by
+timestamp proximity: every trial phase (`openloop_training`, `baseline`,
+`initial_training`, `training`, `probing`) gets exactly one flash-event file
+and exactly one teleport in the same sequence, so the k-th detected teleport
+pairs with the k-th flash-event file. Only `training`/`probing` windows are
+written out; the rest exist purely to keep that ordinal alignment correct.
+(`initial_training_iter_1_trial_1` is the one exception — it's `con_led.py`'s
+own hard-coded output path before it hears from `trial_coordinator.py` at
+all, describing the same first trial a second time, so it's excluded from the
+count entirely rather than treated as its own trial.)
+
+This can't fix data that was never recorded: if the rig itself drops enough to
+throw off the count — a lost UDP packet, or the session ending mid-trial —
+`slicer.py` says so loudly (`[warn] N flash events but M teleport(s)
+detected...`) and leaves the affected trial's file empty rather than guessing
+a boundary. An empty trial file shows up downstream as "file empty or
+unreadable" in the QC table, which is a reason to look at that specific
+trial by hand, not a bug.

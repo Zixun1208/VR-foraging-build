@@ -1,9 +1,10 @@
 """Acquisition folder -> a formatted session directory.
 
 The rig writes one continuous camera log plus per-trial LED logs. Everything
-downstream wants per-trial trajectory CSVs, so this slices the camera log using
-the trial start times encoded in the flash-event filenames, then attaches the
-FicTrac recording for the same run.
+downstream wants per-trial trajectory CSVs, so this slices the camera log
+using teleports detected directly in its own position column (see slicer.py
+for why: flash-event timestamps are not trustworthy trial boundaries), then
+attaches the FicTrac recording for the same run.
 """
 from __future__ import annotations
 
@@ -16,8 +17,7 @@ from config import Roots
 
 
 def _slice(session_dir: str) -> None:
-    from slicer import collect_windows, slice_camera_log, CAMERA_LOG_RE
-    from datetime import datetime
+    from slicer import collect_flash_events, detect_teleport_rows, build_windows, slice_camera_log, CAMERA_LOG_RE
     from pathlib import Path
 
     unity = Path(session_dir) / "unity"
@@ -27,14 +27,16 @@ def _slice(session_dir: str) -> None:
     if len(logs) > 1:
         print(f"  [warn] {len(logs)} camera logs; using {logs[0].name}")
     cam = logs[0]
-    m = CAMERA_LOG_RE.match(cam.name)
-    if m is None:
+    if CAMERA_LOG_RE.match(cam.name) is None:
         raise SystemExit(f"unexpected camera-log name: {cam.name}")
-    day = datetime.strptime(m.group("date"), "%Y-%m-%d")
 
-    windows = collect_windows(Path(session_dir) / "flash_events", day)
-    if not windows:
-        raise SystemExit(f"no trial windows found in {session_dir}/flash_events")
+    flash_dir = Path(session_dir) / "flash_events"
+    events = collect_flash_events(flash_dir)
+    if not events:
+        raise SystemExit(f"no flash-event files found in {flash_dir}")
+    teleport_rows = detect_teleport_rows(cam)
+    windows = build_windows(events, teleport_rows, verbose=True)
+
     counts = slice_camera_log(
         camera_log_path=cam, windows=windows,
         training_dir=Path(session_dir) / "training",
@@ -42,7 +44,8 @@ def _slice(session_dir: str) -> None:
         verbose=False,
     )
     empty = [n for n, c in counts.items() if c == 0]
-    print(f"  sliced {len(counts)} trials, {sum(counts.values()):,} rows")
+    print(f"  sliced {len(counts)} trials, {sum(counts.values()):,} rows "
+          f"({len(teleport_rows)} teleports detected, {len(events)} flash events)")
     if empty:
         print(f"  [warn] {len(empty)} trial(s) got no camera rows: {empty[:5]}")
 

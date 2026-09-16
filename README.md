@@ -173,9 +173,12 @@ What happens, in order (`--steps` picks a subset of `ingest,qc,recommend,figures
 
 1. **ingest** — copies `unity/` and `flash_events/` from `<acq-root>/<acq-id>/` into
    `<raw-root>/<date>/<task>/<sub>/`, slices the camera log into per-trial CSVs
-   under `training/` and `probing/`, and copies the matching FicTrac `.dat` from
-   `<fictrac-root>/<acq-id>/` plus a turn cache (`--skip-fictrac` skips this
-   multi-GB copy). The raw acquisition folder is left untouched.
+   under `training/` and `probing/` (cut at teleports detected in the position
+   column itself, not at flash-event timestamps — see
+   [`analysis/foraging_preprocess/README.md`](analysis/foraging_preprocess/README.md#slicing-why-not-by-timestamp)
+   for why that distinction matters), and copies the matching FicTrac `.dat`
+   from `<fictrac-root>/<acq-id>/` plus a turn cache (`--skip-fictrac` skips
+   this multi-GB copy). The raw acquisition folder is left untouched.
 2. **qc** — prints a per-trial table: duration, farthest x, moving fraction,
    longest stall, dwell in each patch, keep/drop verdict with reasons.
 3. **recommend** — writes `session_selection_recommended_<date>_<sub>.json`.
