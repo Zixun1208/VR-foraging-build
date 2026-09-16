@@ -153,12 +153,16 @@ cd analysis/foraging_preprocess
 pip install -r requirements.txt                 # once, if numpy/matplotlib are missing
 
 # the whole day's runs (usual case)
-python preprocess.py --batch --date 2026-09-11 --dry-run   # see the plan first; changes nothing
-python preprocess.py --batch --date 2026-09-11             # then do it
+python preprocess.py --batch --date 2026-09-11             # do it directly, prompting as it goes
+python preprocess.py --batch --date 2026-09-11 --dry-run   # or preview the plan first, changes nothing
 
 # or a single run, by its acquisition id (the run's TIMESTAMP)
 python preprocess.py --acquisition 20260911_160349
 ```
+
+`--dry-run` is optional, not a required first step — worth reaching for when
+you're unsure the short-session heuristic will call a day's runs right, since
+archiving moves folders and a `sub-N` assignment is permanent once made.
 
 **Always state ATR status.** `--atr` defaults to `yes`. For a non-ATR control
 pass `--atr no` (adds the `_non-atr` task suffix); if you don't know, pass

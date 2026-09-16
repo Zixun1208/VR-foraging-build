@@ -81,6 +81,14 @@ python preprocess.py --batch --date 2026-09-11 --yes       # auto-archive flagge
 python preprocess.py --batch --date 2026-09-11 --dry-run   # show the plan, touch nothing
 ```
 
+`--dry-run` isn't required — without it, `--batch` just runs, prompting you as
+it goes. It's there because two things it does aren't casually undone: it
+moves folders on disk (archiving), and once an acquisition gets a `sub-N` that
+number is permanent (recorded in the manifest, never reused). Run `--dry-run`
+first when you're not sure the short-session heuristic will call it right, or
+just to sanity-check the acquisition count for the date before anything moves;
+skip it if you already know what that day's runs look like.
+
 Every other flag (`--atr`, `--steps`, thresholds, roots, ...) applies to each
 acquisition it runs, e.g. `--batch --date 2026-09-11 --atr no`.
 
