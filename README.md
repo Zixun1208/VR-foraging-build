@@ -109,19 +109,39 @@ culprit with `lsof -iUDP:<port>`.
 
 `analysis/foraging_preprocess/` turns one rig acquisition (the continuous
 `unity/CameraLog_*.csv` plus `flash_events/` this repo writes under
-`csv_main_dir`) into per-trial trajectory CSVs, runs QC on them, and
-recommends which trials to keep. It reads this repo's own
-`experiment_config.json` as the authority on the task, so the two stay in
-sync automatically.
+`csv_main_dir`) into per-trial trajectory CSVs, QCs them, and recommends which
+trials to keep. It reads this repo's own `experiment_config.json` as the
+authority on the task (corridor length, zone voltages, decay durations), so a
+protocol change here is automatically picked up there too.
 
 ```bash
 cd analysis/foraging_preprocess
-python preprocess.py --acquisition 20260810_153938        # one session
-python preprocess.py --batch --date 2026-09-11            # a whole day
+
+# one acquisition, right after it finishes
+python preprocess.py --acquisition 20260810_153938
+
+# a whole day: finds every acquisition for the date, flags ones that look too
+# short to be a real session, archives what you confirm, preprocesses the rest
+python preprocess.py --batch --date 2026-09-11 --dry-run    # see the plan first
+python preprocess.py --batch --date 2026-09-11              # then do it
 ```
 
+Always pass `--atr no` for a non-ATR control (`--atr yes` is the default) —
+nothing in the raw files records this, so it can't be recovered later if you
+forget. Each acquisition's `sub-N` is assigned automatically and remembered in
+`<raw-root>/<date>/.run_day_manifest.json`, so re-running an acquisition (with
+or without `--batch`) always lands back on its own number instead of
+colliding with another fly's `sub-1`.
+
+Four steps run per acquisition (`--steps` picks a subset): **ingest** (copy +
+slice into per-trial CSVs, attach FicTrac), **qc** (per-trial metrics and a
+keep/drop table), **recommend** (write a trial-selection JSON; `--apply` makes
+it live), **figures** (trajectories, occupancy/speed heatmaps, across-trial
+average).
+
 It is self-contained (numpy + matplotlib only, no install) and safe to copy
-to a rig machine on its own — see `analysis/foraging_preprocess/README.md`
+to a rig machine on its own — see
+[`analysis/foraging_preprocess/README.md`](analysis/foraging_preprocess/README.md)
 for the full step/flag/threshold reference.
 
 ## License
