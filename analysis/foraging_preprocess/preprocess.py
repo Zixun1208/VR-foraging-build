@@ -407,7 +407,7 @@ def process_one(args, roots: Roots) -> int:
 
     if exp_cfg is not None:
         want = expconfig.expected_trial_counts(exp_cfg)
-        for phase in ("training", "probing"):
+        for phase in ("training", "probing", "openloop_training", "baseline"):
             have = len(glob.glob(os.path.join(session_dir, phase, "*.csv")))
             if want[phase] and have != want[phase]:
                 print(f"[warn] {phase}: {have} trials on disk, config expects "

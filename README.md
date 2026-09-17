@@ -173,14 +173,17 @@ What happens, in order (`--steps` picks a subset of `ingest,qc,recommend,figures
 
 1. **ingest** — copies `unity/` and `flash_events/` from `<acq-root>/<acq-id>/` into
    `<raw-root>/<date>/<task>/<sub>/`, slices the camera log into per-trial CSVs
-   under `training/` and `probing/` (cut at teleports detected in the position
-   column itself, not at flash-event timestamps — see
+   under `training/`, `probing/`, `openloop_training/` and `baseline/` (cut at
+   teleports detected in the position column itself, not at flash-event
+   timestamps — see
    [`analysis/foraging_preprocess/README.md`](analysis/foraging_preprocess/README.md#slicing-why-not-by-timestamp)
    for why that distinction matters), and copies the matching FicTrac `.dat`
    from `<fictrac-root>/<acq-id>/` plus a turn cache (`--skip-fictrac` skips
    this multi-GB copy). The raw acquisition folder is left untouched.
-2. **qc** — prints a per-trial table: duration, farthest x, moving fraction,
-   longest stall, dwell in each patch, keep/drop verdict with reasons.
+2. **qc** — prints a per-trial table for training/probing trials: duration,
+   farthest x, moving fraction, longest stall, dwell in each patch, keep/drop
+   verdict with reasons. Open-loop/baseline trials aren't foraging trials, so
+   they're sliced but not QC'd.
 3. **recommend** — writes `session_selection_recommended_<date>_<sub>.json`.
 4. **figures** — trajectories, occupancy and speed heatmaps, and across-trial
    averages into `<session>/qc/`.
@@ -231,11 +234,21 @@ A formatted session looks like:
 <raw-root>/<date>/<task>/<sub>/
   unity/  flash_events/            copied from the acquisition
   training/  probing/              one trajectory CSV per trial
+  openloop_training/  baseline/    same, when the protocol used them
   fictrac-*.dat  *.turn_c7_t24.npz
   session_selection_recommended_<date>_<sub>.json
   session_selection_<date>_<sub>.json   (only after --apply or hand curation)
   qc/                              figures
 ```
+
+`openloop_training/` and `baseline/` are sliced the same way as
+training/probing, but aren't QC'd, don't feed the trial-selection
+recommendation, and don't get figures — those are about picking foraging
+trials to analyze, and open-loop/baseline trials aren't foraging trials.
+They're written out so the raw per-trial trajectories are still available if
+you want to check a habituation or open-loop control by hand, and because the
+expected-trial-count check (see below) now covers all four phases, not just
+training/probing.
 
 ### Keeping analysis in step with the rig
 
@@ -246,6 +259,12 @@ A formatted session looks like:
   changing the GUI config for the next protocol, or pass `--task` explicitly. A
   mismatch between the config and what the flash logs recorded is printed as a
   `[warn] config vs recorded data` line. Don't ignore it.
+- **Expected trial counts also come from the config**: `iterations x
+  training_trials_per_iteration` / `x probing_trials_per_iteration` for
+  training/probing, and `openloop_training_iterations` /
+  `baseline_iterations` directly (those two are one trial per iteration, no
+  per-iteration multiplier). A mismatch against what's actually on disk
+  prints `[warn] <phase>: N trials on disk, config expects M`.
 - A session that is already formatted keeps its task from its directory name,
   so re-running QC on old sessions after a config change won't rename them.
 - **Patch band positions live in the Unity scene**, not in any config. If a

@@ -17,7 +17,10 @@ from config import Roots
 
 
 def _slice(session_dir: str) -> None:
-    from slicer import collect_flash_events, detect_teleport_rows, build_windows, slice_camera_log, CAMERA_LOG_RE
+    from slicer import (
+        SLICED_PHASES, collect_flash_events, detect_teleport_rows,
+        build_windows, slice_camera_log, CAMERA_LOG_RE,
+    )
     from pathlib import Path
 
     unity = Path(session_dir) / "unity"
@@ -37,12 +40,12 @@ def _slice(session_dir: str) -> None:
     teleport_rows = detect_teleport_rows(cam)
     windows = build_windows(events, teleport_rows, verbose=True)
 
-    counts = slice_camera_log(
-        camera_log_path=cam, windows=windows,
-        training_dir=Path(session_dir) / "training",
-        probing_dir=Path(session_dir) / "probing",
-        verbose=False,
-    )
+    # training/probing/openloop_training/baseline each get their own
+    # subdirectory; initial_training (con_led's startup duplicate of the
+    # first trial) is excluded -- it's in SLICED_PHASES's complement on
+    # purpose, see collect_flash_events.
+    out_dirs = {phase: Path(session_dir) / phase for phase in SLICED_PHASES}
+    counts = slice_camera_log(camera_log_path=cam, windows=windows, out_dirs=out_dirs, verbose=False)
     empty = [n for n, c in counts.items() if c == 0]
     print(f"  sliced {len(counts)} trials, {sum(counts.values()):,} rows "
           f"({len(teleport_rows)} teleports detected, {len(events)} flash events)")

@@ -133,7 +133,12 @@ def roots_from_config(cfg: dict) -> dict:
 
 
 def expected_trial_counts(cfg: dict) -> dict:
-    """How many trials the config says a complete session should have."""
+    """How many trials the config says a complete session should have.
+
+    ``openloop_training`` and ``baseline`` are one trial per iteration (no
+    per-iteration trial count, unlike training/probing) -- matches
+    ``total_scheduled_trials`` in trial_coordinator.py.
+    """
     def _int(key):
         try:
             return int(float(cfg.get(key, 0)))
@@ -141,7 +146,9 @@ def expected_trial_counts(cfg: dict) -> dict:
             return 0
     iters = _int("iterations")
     return {"training": iters * _int("training_trials_per_iteration"),
-            "probing": iters * _int("probing_trials_per_iteration")}
+            "probing": iters * _int("probing_trials_per_iteration"),
+            "openloop_training": _int("openloop_training_iterations"),
+            "baseline": _int("baseline_iterations")}
 
 
 def cross_check(details: dict, evidence: dict) -> list[str]:

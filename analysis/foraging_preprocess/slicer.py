@@ -68,10 +68,13 @@ CAMERA_LOG_RE = re.compile(
     r"^CameraLog_(?P<date>\d{4}-\d{2}-\d{2})_\d{2}-\d{2}-\d{2}\.csv$"
 )
 
-# Only these phases get written out as trial CSVs. Every other phase
-# (openloop_training, baseline, initial_training, ...) still counts toward
-# the ordinal alignment against detected teleports, but its rows are dropped.
-SLICED_PHASES = ("training", "probing")
+# Phases written out as trial CSVs by default, one subdirectory each.
+# "initial_training" is deliberately excluded (see collect_flash_events):
+# it's con_led.py's own startup filename for the same first trial another
+# event already describes, not a distinct trial. A phase can still be
+# ordinally aligned against detected teleports without being written out --
+# slice_camera_log only writes whatever phases are keys in its `out_dirs`.
+SLICED_PHASES = ("training", "probing", "openloop_training", "baseline")
 
 
 @dataclass
@@ -242,14 +245,21 @@ def collect_windows(flash_dir: Path, camera_log_path: Path, verbose: bool = True
 def slice_camera_log(
     camera_log_path: Path,
     windows: list[TrialWindow],
-    training_dir: Path,
-    probing_dir: Path,
+    out_dirs: dict[str, Path],
     verbose: bool = True,
 ) -> dict[str, int]:
-    training_dir.mkdir(parents=True, exist_ok=True)
-    probing_dir.mkdir(parents=True, exist_ok=True)
+    """Write each window to ``out_dirs[window.phase]``.
 
-    to_write = [w for w in windows if w.phase in SLICED_PHASES]
+    A phase with no entry in ``out_dirs`` is skipped entirely -- it still
+    contributed to the ordinal alignment in ``build_windows``, it just isn't
+    persisted. This is what lets a caller choose which phases to keep (e.g.
+    training/probing/openloop_training/baseline, but never initial_training)
+    without slicer.py hard-coding that choice itself.
+    """
+    for d in out_dirs.values():
+        d.mkdir(parents=True, exist_ok=True)
+
+    to_write = [w for w in windows if w.phase in out_dirs]
     row_counts: dict[str, int] = {w.filename: 0 for w in to_write}
     if not to_write:
         return row_counts
@@ -262,7 +272,7 @@ def slice_camera_log(
     def writer_for(window: TrialWindow) -> csv.writer:
         if window.filename in writers:
             return writers[window.filename]
-        out_dir = training_dir if window.phase == "training" else probing_dir
+        out_dir = out_dirs[window.phase]
         f = open(out_dir / window.filename, "w", newline="")
         w = csv.writer(f)
         w.writerow(header)
@@ -314,6 +324,8 @@ def main() -> int:
     ap.add_argument("--unity-subdir", default="unity")
     ap.add_argument("--training-subdir", default="training")
     ap.add_argument("--probing-subdir", default="probing")
+    ap.add_argument("--openloop-subdir", default="openloop_training")
+    ap.add_argument("--baseline-subdir", default="baseline")
     ap.add_argument("--camera-log", type=Path, default=None,
                     help="Explicit camera log path (default: auto-detect CameraLog_*.csv).")
     ap.add_argument("--reset-from-pos", type=float, default=90.0,
@@ -327,8 +339,12 @@ def main() -> int:
     data_dir: Path = args.data_dir
     flash_dir = data_dir / args.flash_subdir
     unity_dir = data_dir / args.unity_subdir
-    training_out = data_dir / args.training_subdir
-    probing_out = data_dir / args.probing_subdir
+    out_dirs = {
+        "training": data_dir / args.training_subdir,
+        "probing": data_dir / args.probing_subdir,
+        "openloop_training": data_dir / args.openloop_subdir,
+        "baseline": data_dir / args.baseline_subdir,
+    }
 
     if args.camera_log is not None:
         camera_log = args.camera_log
@@ -360,17 +376,14 @@ def main() -> int:
         print(f"  {w.phase:<18} iter {w.iteration} trial {w.trial}  rows [{w.start_row}, {end})  -> {w.filename}")
 
     print(f"\nSlicing camera log ({camera_log.stat().st_size / 1e6:.1f} MB)...")
-    counts = slice_camera_log(
-        camera_log_path=camera_log, windows=windows,
-        training_dir=training_out, probing_dir=probing_out,
-    )
+    counts = slice_camera_log(camera_log_path=camera_log, windows=windows, out_dirs=out_dirs)
 
     print("\nPer-trial camera-log row counts:")
     for w in windows:
-        if w.phase not in SLICED_PHASES:
+        if w.phase not in out_dirs:
             continue
-        out_dir = training_out if w.phase == "training" else probing_out
-        print(f"  {w.phase:<8} iter {w.iteration} trial {w.trial}:  {counts[w.filename]:>8,} rows -> {out_dir / w.filename}")
+        print(f"  {w.phase:<18} iter {w.iteration} trial {w.trial}:  "
+              f"{counts[w.filename]:>8,} rows -> {out_dirs[w.phase] / w.filename}")
     print(f"\nTotal rows written: {sum(counts.values()):,}")
     return 0
 

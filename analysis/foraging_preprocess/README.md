@@ -259,12 +259,15 @@ files still give each teleport-bounded row range its identity
 timestamp proximity: every trial phase (`openloop_training`, `baseline`,
 `initial_training`, `training`, `probing`) gets exactly one flash-event file
 and exactly one teleport in the same sequence, so the k-th detected teleport
-pairs with the k-th flash-event file. Only `training`/`probing` windows are
-written out; the rest exist purely to keep that ordinal alignment correct.
-(`initial_training_iter_1_trial_1` is the one exception — it's `con_led.py`'s
-own hard-coded output path before it hears from `trial_coordinator.py` at
-all, describing the same first trial a second time, so it's excluded from the
-count entirely rather than treated as its own trial.)
+pairs with the k-th flash-event file. `training`, `probing`,
+`openloop_training` and `baseline` windows each get written to their own
+subdirectory; `initial_training` is the one phase never written out at all —
+it's `con_led.py`'s own hard-coded output path before it hears from
+`trial_coordinator.py`, describing the same first trial a second time, so
+it's excluded from the ordinal count entirely rather than treated as its own
+trial. `slice_camera_log` only writes whatever phases are keys in the
+`out_dirs` mapping it's given, so a caller that only wants training/probing
+can still pass just those two.
 
 This can't fix data that was never recorded: if the rig itself drops enough to
 throw off the count — a lost UDP packet, or the session ending mid-trial —
