@@ -4,5 +4,7 @@ __pycache__/
 .cursor/
 test_tools/
 
-# Per-machine GUI working config; shipped defaults live in experiment_defaults.json
+# Per-machine GUI working config -- different on every machine, so never tracked.
+# Shipped defaults live in experiment_defaults.json; a starting point for a new
+# machine is experiment_config.template.json (copy it to experiment_config.json).
 experiment_config.json

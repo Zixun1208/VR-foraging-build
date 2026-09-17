@@ -15,7 +15,8 @@ Python and shell tooling to run **closed-loop VR foraging** on flies with **FicT
 | `exp_gui.py` | NiceGUI web UI (http://127.0.0.1:8080) to edit paths and parameters, save `experiment_config.json`, launch `run_experiment.sh`, and stream its log. Uses `local_file_picker.py` for path browsing. |
 | `experiment_defaults.json` | Shipped experiment parameters — the single source of truth for defaults (see Configuration). |
 | `experiment_defaults.py` | Loads those defaults for every entry point (`--shell` emits them for `run_experiment.sh`). |
-| `experiment_config.json` | Per-machine GUI working copy (untracked): paths plus any parameter overrides. Also read by the analysis pipeline. |
+| `experiment_config.json` | Per-machine GUI working copy (**gitignored**): paths plus any parameter overrides. Also read by the analysis pipeline. |
+| `experiment_config.template.json` | Tracked starting point for a new machine — copy it to `experiment_config.json` and fill in the paths. |
 | `ports.py` | The UDP wiring, declared once for the Python side (see UDP ports). Run directly, it checks the ports are free. |
 | `log_markers.py` | `[PREFLIGHT …]` / `[COMPONENT …]` log prefixes shared by the launcher, `con_led.py` and the GUI's notifications. |
 | `analysis/foraging_preprocess/` | Offline pipeline: acquisition → per-trial CSVs → QC → trial-selection recommendation → figures (see Analysis). |
@@ -43,8 +44,8 @@ There is no inter-trial interval and no per-trial timer: a trial lasts as long a
 ## Configuration
 
 1. **`experiment_defaults.json`** (tracked) holds the shipped experiment parameters — iteration counts, zone specs, voltages, decay mode. It is the single source of truth: `run_experiment.sh`, `exp_gui.py` and `con_led.py` all read it through `experiment_defaults.py`, so no launcher can silently disagree with another. Edit it to change the protocol.
-2. **`experiment_config.json`** (untracked, per-machine) is the GUI's working copy: absolute paths for the Unity binary, FicTrac binary/config, this repo's scripts, log working directory, and raw CSV root, plus any parameter overrides. Precedence at run time is **CLI flag > `experiment_config.json` > `experiment_defaults.json`**.
-3. Or run **`python exp_gui.py`**, browse to those paths, set iteration counts, trials per iteration, zones, voltages, open-loop and baseline options, then save.
+2. **`experiment_config.json`** (untracked, per-machine) is the GUI's working copy: absolute paths for the Unity binary, FicTrac binary/config, this repo's scripts, log working directory, and raw CSV root, plus any parameter overrides. Precedence at run time is **CLI flag > `experiment_config.json` > `experiment_defaults.json`**. It's gitignored on purpose: every machine's paths are different, so tracking it just means merge conflicts on every pull. On a new machine, `cp experiment_config.template.json experiment_config.json` and fill in the (currently blank) path fields — the parameter fields already match `experiment_defaults.json`.
+3. Or run **`python exp_gui.py`**, browse to those paths, set iteration counts, trials per iteration, zones, voltages, open-loop and baseline options, then save — this creates `experiment_config.json` for you if it doesn't exist yet.
 4. **`run_experiment.sh`** reads paths from environment variables — `UNITY_EXE`, `FICTRAC_EXE`, `FICTRAC_CONFIG`, `CALC_PATH`, `CON_LED`, `TRIAL_COORDINATOR`, `WORKING_DIR`, `CSV_MAIN_DIR`, `FICTRAC_WORKING_DIR` — falling back to hard-coded paths under `/home/kazama`. The GUI sets these from its config; set them yourself on any other machine.
 
 ## Running
