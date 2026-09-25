@@ -389,8 +389,29 @@ def process_one(args, roots: Roots) -> int:
     if "ingest" in steps:
         if not args.acquisition:
             raise SystemExit("--acquisition is required for the ingest step")
+        # The config's trial schedule lets the slicer catch a missing or extra
+        # trial, not just a wrong teleport count. Fresh material only -- and if
+        # the default config isn't on this machine, slice without that check
+        # rather than fail; one passed explicitly must load.
+        schedule = None
+        if exp_cfg is None:
+            try:
+                exp_cfg_sched = expconfig.load(args.experiment_config)
+            except SystemExit as e:
+                if args.experiment_config:
+                    raise
+                print(f"[slice] no experiment config to check the trial schedule "
+                      f"against; checking the teleport count only.\n        ({e})")
+                exp_cfg_sched = None
+        else:
+            exp_cfg_sched = exp_cfg
+        if exp_cfg_sched is not None:
+            schedule = expconfig.expected_schedule(exp_cfg_sched)
+            print(f"[slice] checking trials against {exp_cfg_sched['_path']}: "
+                  f"{len(schedule)} scheduled")
         session_dir = ingest(args.acquisition, task, date, args.sub, roots,
-                             skip_fictrac=args.skip_fictrac)
+                             skip_fictrac=args.skip_fictrac, schedule=schedule,
+                             strict_slicing=not args.lenient_slicing)
 
     if not os.path.isdir(session_dir):
         raise SystemExit(f"no session at {session_dir}\nroots in use:\n{roots.describe()}")
@@ -520,6 +541,11 @@ def build_parser() -> argparse.ArgumentParser:
                     help="'analysis' reuses ~/Analysis/foraging so figures match the "
                          "notebook; needs that package present (default: %(default)s)")
     ap.add_argument("--out-dir", help="where figures go (default: <session>/qc/)")
+    ap.add_argument("--lenient-slicing", action="store_true",
+                    help="if the recorded trials do not match the experiment "
+                         "structure (teleport count, or the config's trial schedule), "
+                         "slice anyway with a warning instead of refusing. Labels past "
+                         "the first mismatch are then unreliable.")
     ap.add_argument("--skip-fictrac", action="store_true",
                     help="do not copy the FicTrac recording (it is often several GB)")
 

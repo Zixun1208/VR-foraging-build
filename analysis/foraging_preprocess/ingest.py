@@ -16,10 +16,14 @@ import sys
 from config import Roots
 
 
-def _slice(session_dir: str) -> None:
+def _slice(session_dir: str, schedule=None, strict: bool = True) -> None:
+    """``schedule`` is the config's expected trial sequence
+    (``expconfig.expected_schedule``); ``None`` skips that check but the
+    teleport-count check still runs."""
     from slicer import (
-        SLICED_PHASES, collect_flash_events, detect_teleport_rows,
-        build_windows, slice_camera_log, CAMERA_LOG_RE,
+        SLICED_PHASES, SliceStructureError, collect_flash_events,
+        detect_teleport_rows, build_windows, slice_camera_log, validate_structure,
+        CAMERA_LOG_RE,
     )
     from pathlib import Path
 
@@ -38,17 +42,27 @@ def _slice(session_dir: str) -> None:
     if not events:
         raise SystemExit(f"no flash-event files found in {flash_dir}")
     teleport_rows = detect_teleport_rows(cam)
-    windows = build_windows(events, teleport_rows, verbose=True)
+    try:
+        validate_structure(events, teleport_rows, schedule, strict=strict)
+    except SliceStructureError as e:
+        raise SystemExit(
+            f"refusing to slice {cam.name}: the recorded trials do not match the "
+            f"experiment structure.\n{e}\n"
+            "Pass --lenient-slicing to slice anyway (labels past the first "
+            "mismatch will be unreliable).") from e
+    windows = build_windows(events, teleport_rows)
 
     # training/probing/openloop_training/baseline each get their own
-    # subdirectory; initial_training (con_led's startup duplicate of the
-    # first trial) is excluded -- it's in SLICED_PHASES's complement on
-    # purpose, see collect_flash_events.
+    # subdirectory. con_led's startup initial_training file never reaches
+    # here: collect_flash_events drops it.
     out_dirs = {phase: Path(session_dir) / phase for phase in SLICED_PHASES}
     counts = slice_camera_log(camera_log_path=cam, windows=windows, out_dirs=out_dirs, verbose=False)
     empty = [n for n, c in counts.items() if c == 0]
-    print(f"  sliced {len(counts)} trials, {sum(counts.values()):,} rows "
-          f"({len(teleport_rows)} teleports detected, {len(events)} flash events)")
+    by_phase: dict[str, int] = {}
+    for w in windows:
+        by_phase[w.phase] = by_phase.get(w.phase, 0) + 1
+    print(f"  sliced {len(counts)} trials ({', '.join(f'{n} {p}' for p, n in by_phase.items())}), "
+          f"{sum(counts.values()):,} rows ({len(teleport_rows)} teleports detected)")
     if empty:
         print(f"  [warn] {len(empty)} trial(s) got no camera rows: {empty[:5]}")
 
@@ -115,7 +129,7 @@ def _build_turn_cache(dat_path: str, roots: Roots) -> None:
 
 
 def ingest(acq_id: str, task: str, date: str, sub: str, roots: Roots,
-           skip_fictrac: bool = False) -> str:
+           skip_fictrac: bool = False, schedule=None, strict_slicing: bool = True) -> str:
     src = os.path.join(roots.acq_root, acq_id)
     if not os.path.isdir(src):
         raise SystemExit(f"no acquisition folder at {src}")
@@ -132,7 +146,7 @@ def ingest(acq_id: str, task: str, date: str, sub: str, roots: Roots,
     if existing:
         print(f"  {len(existing)} training CSVs already sliced; leaving them alone")
     else:
-        _slice(dest)
+        _slice(dest, schedule, strict_slicing)
 
     if not skip_fictrac:
         attach_fictrac(dest, acq_id, roots)

@@ -256,23 +256,47 @@ a sharp drop from near the corridor's far end to near its start, which is a
 teleport full stop, independent of any other process's clock. Flash-event
 files still give each teleport-bounded row range its identity
 (phase/iteration/trial/output filename), matched by **order**, not by
-timestamp proximity: every trial phase (`openloop_training`, `baseline`,
-`initial_training`, `training`, `probing`) gets exactly one flash-event file
-and exactly one teleport in the same sequence, so the k-th detected teleport
-pairs with the k-th flash-event file. `training`, `probing`,
-`openloop_training` and `baseline` windows each get written to their own
-subdirectory; `initial_training` is the one phase never written out at all —
-it's `con_led.py`'s own hard-coded output path before it hears from
-`trial_coordinator.py`, describing the same first trial a second time, so
-it's excluded from the ordinal count entirely rather than treated as its own
-trial. `slice_camera_log` only writes whatever phases are keys in the
-`out_dirs` mapping it's given, so a caller that only wants training/probing
-can still pass just those two.
+timestamp proximity: every trial (`openloop_training`, `baseline`, `training`,
+`probing`) gets exactly one flash-event file and exactly one teleport in the
+same sequence, so the k-th detected teleport ends the k-th flash-event file's
+trial. `training`, `probing`, `openloop_training` and `baseline` windows each
+get written to their own subdirectory. `con_led.py`'s startup
+`initial_training_*` file is not a trial: it's its own hard-coded output path
+before it hears from `trial_coordinator.py`, describing the first real trial a
+second time. It is dropped before pairing — counting it shifts every trial's
+label by one. `slice_camera_log` only writes whatever phases are keys in the
+`out_dirs` mapping it's given.
+
+### Checking the experiment structure before slicing
+
+Ordinal pairing is only as good as the counts behind it: one missed teleport
+mislabels every trial after it. So `ingest` validates first
+(`slicer.validate_structure`), and **refuses to slice** if:
+
+- the number of detected teleports is not `trials - 1` (the first trial starts
+  at row 0 and the last ends at end of file, so only the gaps between trials
+  show up), or
+- the trials recorded in `flash_events/` are not the start of the schedule the
+  rig's `experiment_config.json` describes — `openloop_training_iterations`
+  open-loop trials, then `baseline_iterations` baselines, then for each of
+  `iterations` iterations its `training_trials_per_iteration` training trials
+  followed by its `probing_trials_per_iteration` probing trials
+  (`expconfig.expected_schedule`, mirroring `TrialSchedule` in
+  `trial_coordinator.py`). A missing, extra or reordered trial is an error;
+  a session that simply stopped early is only a warning.
+
+The config describes the build *as it is now*, so a session recorded under a
+different structure fails the second check. Point `--experiment-config` at the
+config it actually ran with. If no config is found at the default location the
+schedule check is skipped (with a note) and only the teleport count is checked;
+a config passed explicitly must load. `--lenient-slicing` downgrades both
+checks to warnings and slices anyway — labels past the first mismatch are then
+unreliable. `python slicer.py --experiment-config ... [--lenient]` does the same
+for a standalone run.
 
 This can't fix data that was never recorded: if the rig itself drops enough to
 throw off the count — a lost UDP packet, or the session ending mid-trial —
-`slicer.py` says so loudly (`[warn] N flash events but M teleport(s)
-detected...`) and leaves the affected trial's file empty rather than guessing
-a boundary. An empty trial file shows up downstream as "file empty or
-unreadable" in the QC table, which is a reason to look at that specific
-trial by hand, not a bug.
+`slicer.py` says so (see the checks above) instead of guessing a boundary. With
+`--lenient-slicing` it slices anyway; the affected trials may then be empty or
+mislabeled, and an empty trial file shows up downstream as "file empty or
+unreadable" in the QC table — a reason to look at that trial by hand.

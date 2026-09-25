@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Slice the Unity camera log into per-trial CSVs.
 
-Vendored verbatim from ``~/Analysis/slice_camera_log.py`` (stdlib-only, no local
-imports) so this package runs on a machine that has no ~/Analysis tree. If you
-change the slicing logic, change it there and re-copy, or the two will drift.
+Started as a copy of ``~/Analysis/slice_camera_log.py`` (stdlib-only, so this
+package runs on a machine that has no ~/Analysis tree) and has since diverged:
+it drops ``initial_training`` and validates the experiment structure.
 
 Each flash-event file is named like:
     training_iter_{iter}_trial_{trial}_YYYYMMDD_HHMMSS_mmm.csv
@@ -31,11 +31,19 @@ a sharp drop from near the corridor's far end to near its start is a teleport,
 full stop, independent of any other process's clock. Flash-event files are
 still needed, but only to give each teleport-bounded row range an identity
 (phase/iteration/trial/output filename), matched by ORDER rather than by
-timestamp proximity: every trial phase (openloop_training, baseline,
-initial_training, training, probing) gets exactly one flash-event file and
-exactly one teleport, in the same sequence, so the k-th detected teleport
-corresponds to the k-th flash-event file. Only training/probing windows are
-written out; the rest exist purely to keep that ordinal alignment correct.
+timestamp proximity: every trial (openloop_training, baseline, training,
+probing) gets exactly one flash-event file and exactly one teleport, in the
+same sequence, so the k-th detected teleport ends the k-th flash-event file's
+trial. con_led.py's startup ``initial_training_*`` file is NOT a trial -- it
+describes the first real trial a second time -- so it is dropped up front;
+counting it would shift every trial's label by one.
+
+Because that pairing is purely ordinal, one missed teleport silently mislabels
+every trial after it. So before slicing, ``validate_structure`` checks the
+experiment's structure two ways: the teleport count must equal trials - 1, and
+(when the rig's ``experiment_config.json`` is available) the flash files must
+follow the schedule it describes -- baselines, then per iteration its training
+and probing trials, in order -- with no trial missing or unexpected.
 
 Midnight rollover needs no handling here at all: since cutting is done by row
 index rather than by comparing timestamps across the log and the flash-event
@@ -69,11 +77,7 @@ CAMERA_LOG_RE = re.compile(
 )
 
 # Phases written out as trial CSVs by default, one subdirectory each.
-# "initial_training" is deliberately excluded (see collect_flash_events):
-# it's con_led.py's own startup filename for the same first trial another
-# event already describes, not a distinct trial. A phase can still be
-# ordinally aligned against detected teleports without being written out --
-# slice_camera_log only writes whatever phases are keys in its `out_dirs`.
+# "initial_training" is not a phase at all -- see collect_flash_events.
 SLICED_PHASES = ("training", "probing", "openloop_training", "baseline")
 
 
@@ -84,6 +88,11 @@ class FlashEvent:
     trial: int | None
     filename: str
     approx_dt: datetime  # from the filename -- identity only, never a cut point
+
+    @property
+    def key(self) -> tuple[str, int, int | None]:
+        """``(phase, iteration, trial)`` -- the shape ``expconfig.expected_schedule`` yields."""
+        return (self.phase, self.iteration, self.trial)
 
 
 @dataclass
@@ -115,20 +124,26 @@ def parse_flash_event_filename(fname: str) -> FlashEvent | None:
 
 
 def collect_flash_events(flash_dir: Path) -> list[FlashEvent]:
-    """Every flash-event file for this acquisition, of any phase, in
+    """Every trial's flash-event file for this acquisition, of any phase, in
     chronological order by the (approximate) start time in its filename.
 
-    Every phase is included here even though only training/probing get
-    written out later: each one still corresponds to exactly one teleport, so
-    dropping them here would desynchronize the ordinal pairing against the
-    teleports ``detect_teleport_rows`` finds in the camera log.
+    Every trial phase is included even though only some get written out
+    later: each one still corresponds to exactly one teleport, so dropping
+    one here would desynchronize the ordinal pairing against the teleports
+    ``detect_teleport_rows`` finds in the camera log.
+
+    ``initial_training_*`` is the exception, and is dropped. con_led.py writes
+    it under a hard-coded name before the first metadata packet arrives from
+    trial_coordinator.py, which then names the *same* trial again
+    (``training_iter_1_trial_1_*``, or ``baseline_iter_1_*`` ...). Keeping it
+    would count trial 1 twice and shift every label after it by one.
     """
     events = []
     for p in sorted(flash_dir.iterdir()):
         if not p.is_file():
             continue
         ev = parse_flash_event_filename(p.name)
-        if ev is not None:
+        if ev is not None and ev.phase != "initial_training":
             events.append(ev)
     events.sort(key=lambda e: e.approx_dt)
     return events
@@ -200,9 +215,92 @@ def detect_teleport_rows(
     return resets
 
 
-def build_windows(
-    events: list[FlashEvent], teleport_rows: list[int], verbose: bool = True
-) -> list[TrialWindow]:
+class SliceStructureError(Exception):
+    """The flash files, the camera log's teleports and the configured schedule
+    disagree, so ordinal pairing would put trials under the wrong names."""
+
+
+def _fmt_key(key: tuple[str, int, int | None] | None) -> str:
+    if key is None:
+        return "nothing"
+    phase, iteration, trial = key
+    return f"{phase} iter {iteration}" + (f" trial {trial}" if trial is not None else "")
+
+
+def check_structure(
+    events: list[FlashEvent],
+    teleport_rows: list[int],
+    schedule: list[tuple[str, int, int | None]] | None = None,
+) -> tuple[list[str], list[str]]:
+    """Compare what was recorded against what the experiment should look like.
+
+    Returns ``(errors, warnings)``. An error means ordinal pairing cannot be
+    trusted, so labels would be wrong; a warning means the session is merely
+    incomplete, which pairing handles fine.
+
+    * teleports must number ``len(events) - 1``: the first trial starts at
+      row 0 and the last ends at end of file, so only the ``n - 1`` teleports
+      between trials show up. Any other count means a trial boundary was missed
+      or invented, and every trial after it is mislabeled.
+    * with a ``schedule``, the recorded trials must be exactly its first
+      ``len(events)`` entries, in order. A gap or a different trial in the
+      middle is an error; a session that just stopped early is a warning.
+    """
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    want_tp = max(len(events) - 1, 0)
+    if len(teleport_rows) != want_tp:
+        errors.append(
+            f"{len(events)} trial flash files imply {want_tp} teleport(s), but "
+            f"{len(teleport_rows)} were detected in the camera log. A boundary was "
+            "missed (a fly that stopped short of the corridor end, or a dropped UDP "
+            "event) or a trial was cut short; every trial after it would be "
+            "labeled with the wrong rows.")
+
+    if schedule is not None:
+        recorded = [e.key for e in events]
+        for i, (got, want) in enumerate(zip(recorded, schedule)):
+            if got != want:
+                errors.append(
+                    f"trial #{i + 1}: the config schedule expects "
+                    f"{_fmt_key(want)}, but the flash files have {_fmt_key(got)}. "
+                    "A flash file is missing or extra, or the experiment config is not "
+                    "the one this session ran with (it describes the build as it is "
+                    "now -- point --experiment-config at the right one).")
+                break
+        else:
+            if len(recorded) > len(schedule):
+                errors.append(
+                    f"{len(recorded)} trials recorded but the config schedules only "
+                    f"{len(schedule)}; first extra: {_fmt_key(recorded[len(schedule)])}.")
+            elif len(recorded) < len(schedule):
+                warnings.append(
+                    f"session ended early: {len(recorded)} of {len(schedule)} "
+                    f"scheduled trials recorded (last: {_fmt_key(recorded[-1] if recorded else None)}, "
+                    f"next expected: {_fmt_key(schedule[len(recorded)])}).")
+    return errors, warnings
+
+
+def validate_structure(
+    events: list[FlashEvent],
+    teleport_rows: list[int],
+    schedule: list[tuple[str, int, int | None]] | None = None,
+    strict: bool = True,
+) -> None:
+    """Print warnings; raise ``SliceStructureError`` on errors unless ``strict``
+    is off, in which case errors are printed as warnings and slicing proceeds
+    (labels past the first inconsistency should then be checked by hand)."""
+    errors, warnings = check_structure(events, teleport_rows, schedule)
+    for w in warnings:
+        print(f"[warn] {w}", file=sys.stderr)
+    if errors and strict:
+        raise SliceStructureError("\n".join(errors))
+    for e in errors:
+        print(f"[warn] {e}", file=sys.stderr)
+
+
+def build_windows(events: list[FlashEvent], teleport_rows: list[int]) -> list[TrialWindow]:
     """Pair each flash event with a teleport-bounded row range, by ORDER.
 
     Never by matching timestamps across processes -- that's what produced the
@@ -210,18 +308,10 @@ def build_windows(
     row 0 (the fly is already at ``trial_start_z`` from process startup);
     event i>0 starts at the (i-1)-th detected teleport; each ends at the next
     teleport, or at end of file for the very last event.
-    """
-    n_expected = len(events) - 1
-    if len(teleport_rows) != n_expected and verbose:
-        print(
-            f"[warn] {len(events)} flash events but {len(teleport_rows)} "
-            f"teleport(s) detected in the camera log (expected {n_expected}). "
-            "Likely a dropped UDP boundary event or a session that ended "
-            "mid-trial -- trial boundaries past the mismatch may be wrong; "
-            "check the affected trial(s) by hand.",
-            file=sys.stderr,
-        )
 
+    Call ``validate_structure`` first: this does no consistency checking of
+    its own and assumes ``len(teleport_rows) == len(events) - 1``.
+    """
     windows = []
     prev_end = 0
     for i, ev in enumerate(events):
@@ -235,11 +325,17 @@ def build_windows(
     return windows
 
 
-def collect_windows(flash_dir: Path, camera_log_path: Path, verbose: bool = True) -> list[TrialWindow]:
-    """Convenience wrapper: flash events + detected teleports -> windows."""
+def collect_windows(
+    flash_dir: Path,
+    camera_log_path: Path,
+    schedule: list[tuple[str, int, int | None]] | None = None,
+    strict: bool = True,
+) -> list[TrialWindow]:
+    """Convenience wrapper: flash events + detected teleports -> validated windows."""
     events = collect_flash_events(flash_dir)
     teleport_rows = detect_teleport_rows(camera_log_path)
-    return build_windows(events, teleport_rows, verbose=verbose)
+    validate_structure(events, teleport_rows, schedule, strict=strict)
+    return build_windows(events, teleport_rows)
 
 
 def slice_camera_log(
@@ -253,8 +349,7 @@ def slice_camera_log(
     A phase with no entry in ``out_dirs`` is skipped entirely -- it still
     contributed to the ordinal alignment in ``build_windows``, it just isn't
     persisted. This is what lets a caller choose which phases to keep (e.g.
-    training/probing/openloop_training/baseline, but never initial_training)
-    without slicer.py hard-coding that choice itself.
+    training/probing/openloop_training/baseline only) without slicer.py hard-coding that choice itself.
     """
     for d in out_dirs.values():
         d.mkdir(parents=True, exist_ok=True)
@@ -334,7 +429,18 @@ def main() -> int:
                     help="Position right after the drop must be <= this (default: %(default)s).")
     ap.add_argument("--min-reset-drop", type=float, default=50.0,
                     help="Minimum position drop, row to row, to count as a teleport (default: %(default)s).")
+    ap.add_argument("--experiment-config", default=None,
+                    help="the rig's experiment_config.json; when given, the flash files "
+                         "are checked against the trial schedule it describes.")
+    ap.add_argument("--lenient", action="store_true",
+                    help="downgrade structure mismatches from errors to warnings and "
+                         "slice anyway (labels past the first mismatch are unreliable).")
     args = ap.parse_args()
+
+    schedule = None
+    if args.experiment_config:
+        import expconfig
+        schedule = expconfig.expected_schedule(expconfig.load(args.experiment_config))
 
     data_dir: Path = args.data_dir
     flash_dir = data_dir / args.flash_subdir
@@ -362,7 +468,7 @@ def main() -> int:
     print(f"Camera log       : {camera_log}")
 
     events = collect_flash_events(flash_dir)
-    print(f"Found {len(events)} flash event(s) (all phases).")
+    print(f"Found {len(events)} trial flash event(s) (initial_training excluded).")
 
     print("Scanning camera log for teleports...")
     teleport_rows = detect_teleport_rows(
@@ -370,6 +476,11 @@ def main() -> int:
     )
     print(f"Detected {len(teleport_rows)} teleport(s); expected {len(events) - 1}.")
 
+    try:
+        validate_structure(events, teleport_rows, schedule, strict=not args.lenient)
+    except SliceStructureError as e:
+        print(f"[error] cannot slice safely:\n{e}\n(--lenient slices anyway)", file=sys.stderr)
+        return 1
     windows = build_windows(events, teleport_rows)
     for w in windows:
         end = w.end_row if w.end_row is not None else "EOF"

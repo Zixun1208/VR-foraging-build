@@ -151,6 +151,34 @@ def expected_trial_counts(cfg: dict) -> dict:
             "baseline": _int("baseline_iterations")}
 
 
+def expected_schedule(cfg: dict) -> list[tuple[str, int, int | None]]:
+    """The full ordered trial sequence the config describes, as
+    ``(phase, iteration, trial)`` keys. ``trial`` is ``None`` for
+    openloop_training/baseline, whose flash files have no ``_trial_`` suffix.
+
+    Mirrors ``TrialSchedule`` in trial_coordinator.py: all open-loop iterations,
+    then all baseline iterations, then for each main iteration its training
+    trials followed by its probing trials. Keep the two in step.
+    """
+    def _int(key):
+        try:
+            return int(float(cfg.get(key, 0)))
+        except (TypeError, ValueError):
+            return 0
+
+    seq: list[tuple[str, int, int | None]] = []
+    seq += [("openloop_training", i, None)
+            for i in range(1, _int("openloop_training_iterations") + 1)]
+    seq += [("baseline", i, None)
+            for i in range(1, _int("baseline_iterations") + 1)]
+    n_train = _int("training_trials_per_iteration")
+    n_probe = _int("probing_trials_per_iteration")
+    for it in range(1, _int("iterations") + 1):
+        seq += [("training", it, t) for t in range(1, n_train + 1)]
+        seq += [("probing", it, t) for t in range(1, n_probe + 1)]
+    return seq
+
+
 def cross_check(details: dict, evidence: dict) -> list[str]:
     """Compare the config against what the LED logs actually recorded.
 

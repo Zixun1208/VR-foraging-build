@@ -271,9 +271,11 @@ training/probing.
 - **Patch band positions live in the Unity scene**, not in any config. If a
   scene moves them, pass `--patch1 LO-HI --patch2 LO-HI` (defaults `20-40`,
   `100-120`).
-- Only **training** and **probing** trials are sliced. Open-loop training and
-  baseline trials (and con_led's startup `initial_training_*` CSV) are
-  ignored by the pipeline.
+- Training, probing, open-loop training and baseline trials are all sliced,
+  each into its own subdirectory. con_led's startup `initial_training_*` CSV
+  is not a trial (it repeats the first one) and is dropped. Before slicing, the
+  recorded trials are checked against `experiment_config.json`'s schedule; a
+  mismatch aborts the slice (`--lenient-slicing` overrides).
 - If you rename flash CSVs, change the `flash_events/` layout, or change the
   CameraLog format, update `analysis/foraging_preprocess/slicer.py` and
   `tasks.py`, which parse those names.
