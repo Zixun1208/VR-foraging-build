@@ -16,6 +16,31 @@ import sys
 from config import Roots
 
 
+def _already_sliced(session_dir: str) -> bool:
+    """Whether every trial flash file already has a matching sliced CSV.
+
+    Checked by comparing the total sliced count across ALL phase
+    subdirectories against the number of trial flash-event files -- not just
+    whether ``training/`` is non-empty. A per-phase check like that would
+    silently skip slicing a session ingested by an older version of this code
+    that didn't yet slice e.g. ``baseline/``: training's files would already
+    exist, so the whole session would look "already sliced" forever, even
+    though baseline was never written and never will be without a re-slice.
+    """
+    from pathlib import Path
+    from slicer import SLICED_PHASES, collect_flash_events
+
+    flash_dir = Path(session_dir) / "flash_events"
+    if not flash_dir.is_dir():
+        return False
+    n_events = len(collect_flash_events(flash_dir))
+    if n_events == 0:
+        return False
+    n_sliced = sum(len(glob.glob(os.path.join(session_dir, phase, "*.csv")))
+                   for phase in SLICED_PHASES)
+    return n_sliced == n_events
+
+
 def _slice(session_dir: str, schedule=None, strict: bool = True) -> None:
     """``schedule`` is the config's expected trial sequence
     (``expconfig.expected_schedule``); ``None`` skips that check but the
@@ -142,9 +167,8 @@ def ingest(acq_id: str, task: str, date: str, sub: str, roots: Roots,
         if os.path.isdir(s):
             shutil.copytree(s, os.path.join(dest, name), dirs_exist_ok=True)
 
-    existing = glob.glob(os.path.join(dest, "training", "*.csv"))
-    if existing:
-        print(f"  {len(existing)} training CSVs already sliced; leaving them alone")
+    if _already_sliced(dest):
+        print("  already sliced (every trial flash file has a matching CSV); leaving alone")
     else:
         _slice(dest, schedule, strict_slicing)
 
