@@ -83,6 +83,14 @@ def build(raw_root, task, kind="recommended", dates=None):
     return rows
 
 
+def write_csv(rows, out):
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+    with open(out, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=FIELDS)
+        w.writeheader()
+        w.writerows(rows)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--raw-root", default=selection.RAW_ROOT)
@@ -96,15 +104,8 @@ def main():
     if not rows:
         raise SystemExit(f"no selected episodes for {a.task} under {a.raw_root} "
                          f"({a.selection} selections)")
-    info = trials.parse_task(a.task)
-    tag = "_".join(str(int(info["patches"][i]["decay_s"])) for i in (0, 1))
-    out = a.out or os.path.join(HERE, "data",
-                                f"survival_{tag}{'' if info['atr'] else '_non-atr'}.csv")
-    os.makedirs(os.path.dirname(out), exist_ok=True)
-    with open(out, "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=FIELDS)
-        w.writeheader()
-        w.writerows(rows)
+    out = a.out or os.path.join(HERE, "data", f"survival_{trials.task_tag(a.task)}.csv")
+    write_csv(rows, out)
     print(f"wrote {len(rows)} bins, {len({r['visit_id'] for r in rows})} episodes, "
           f"{len({r['fly_id'] for r in rows})} flies -> {out}")
 

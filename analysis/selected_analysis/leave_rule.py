@@ -74,6 +74,22 @@ def plot(res: pd.DataFrame, out: str, title: str) -> None:
     plt.close(fig)
 
 
+def run(csv_path: str, out: str, min_leaves: int = 3, name: str | None = None):
+    """Write ``<name>.csv`` / ``<name>.png`` under ``out``; return the per-fly table or None.
+
+    ``name`` defaults to ``leave_rule_<csv stem without 'survival_'>``.
+    """
+    res = per_fly(pd.read_csv(csv_path), min_leaves)
+    if res.empty:
+        return None
+    tag = os.path.splitext(os.path.basename(csv_path))[0].replace("survival_", "")
+    name = name or f"leave_rule_{tag}"
+    os.makedirs(out, exist_ok=True)
+    res.to_csv(os.path.join(out, f"{name}.csv"), index=False)
+    plot(res, os.path.join(out, f"{name}.png"), tag)
+    return res
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("csv")
@@ -82,13 +98,9 @@ def main():
     ap.add_argument("--out", default=os.path.join(HERE, "results"))
     a = ap.parse_args()
 
-    res = per_fly(pd.read_csv(a.csv), a.min_leaves)
-    if res.empty:
+    res = run(a.csv, a.out, a.min_leaves)
+    if res is None:
         raise SystemExit("no fly has enough completed visits in both patches")
-    tag = os.path.splitext(os.path.basename(a.csv))[0].replace("survival_", "")
-    os.makedirs(a.out, exist_ok=True)
-    res.to_csv(os.path.join(a.out, f"leave_rule_{tag}.csv"), index=False)
-    plot(res, os.path.join(a.out, f"leave_rule_{tag}.png"), tag)
     print(f"{len(res)} flies; median spread " + ", ".join(
         f"{n} {res[f'{n}_spread'].median():.2f}" for n in VARS.values()))
     print("most consistent variable per fly:", res.best.value_counts().to_dict())

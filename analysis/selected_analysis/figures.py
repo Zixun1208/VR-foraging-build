@@ -488,20 +488,13 @@ def fig_repeatability(ctx, surv):
         os.path.join(ctx.out, "dwell_repeatability_by_fly.csv"), index=False)
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--raw-root", default=selection.RAW_ROOT)
-    ap.add_argument("--task", required=True)
-    ap.add_argument("--selection", choices=("recommended", "applied"), default="recommended")
-    ap.add_argument("--survival", required=True, help="csv from build_survival.py")
-    ap.add_argument("--out", required=True)
-    a = ap.parse_args()
-
-    ctx = Ctx(a.raw_root, a.task, a.selection, a.out)
+def run(raw_root, task, kind, survival_csv, out):
+    """Make every figure; returns False if the task has no ATR sessions to plot."""
+    ctx = Ctx(raw_root, task, kind, out)
     if not ctx.sessions:
-        raise SystemExit("no selected sessions")
-    surv = pd.read_csv(a.survival)
-    print(f"{len(ctx.sessions)} sessions -> {a.out}")
+        return False
+    surv = pd.read_csv(survival_csv)
+    print(f"{len(ctx.sessions)} sessions -> {out}")
     centers, prof, mats = occupancy_profiles(ctx)
     fig_occupancy_lines(ctx, centers, prof)
     fig_occupancy_heatmaps(ctx, centers, prof, mats)
@@ -510,6 +503,19 @@ def main():
     fig_geometry(ctx)
     fig_dissociation(ctx, surv)
     fig_repeatability(ctx, surv)
+    return True
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--raw-root", default=selection.RAW_ROOT)
+    ap.add_argument("--task", required=True)
+    ap.add_argument("--selection", choices=("recommended", "applied"), default="recommended")
+    ap.add_argument("--survival", required=True, help="csv from build_survival.py")
+    ap.add_argument("--out", required=True)
+    a = ap.parse_args()
+    if not run(a.raw_root, a.task, a.selection, a.survival, a.out):
+        raise SystemExit("no selected ATR sessions")
 
 
 if __name__ == "__main__":

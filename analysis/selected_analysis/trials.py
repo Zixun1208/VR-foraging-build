@@ -111,3 +111,10 @@ def value_at(flash: dict, zone: int, elapsed: float) -> float:
         return float("nan")
     et, amp = flash[zone]
     return float(np.interp(elapsed, et, amp))
+
+
+def task_tag(task: str) -> str:
+    """Short label for a task: decay seconds, plus ``_non-atr`` for controls (e.g. ``50_50``)."""
+    info = parse_task(task)
+    tag = "_".join(str(int(info["patches"][i]["decay_s"])) for i in (0, 1))
+    return tag if info["atr"] else f"{tag}_non-atr"
