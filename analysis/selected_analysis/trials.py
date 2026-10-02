@@ -35,6 +35,7 @@ def parse_task(task: str) -> dict:
         raise ValueError(f"not a notated task name: {task!r}")
     g = m.groupdict()
     return {
+        "corridor": float(g["corridor"]),
         "patches": {
             0: {"band": (float(g["p1lo"]), float(g["p1hi"])), "start_volt": float(g["v1"]),
                 "decay_s": float(g["d1"])},
