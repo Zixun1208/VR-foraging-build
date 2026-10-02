@@ -8,6 +8,7 @@ just ``--task``); each gets its own folder:
         survival.csv
         leave_rule.csv  leave_rule.png
         figures/*.png
+        learning_fatigue/*.csv  *.png
 
 Steps (``--steps`` picks a subset; each reads the previous step's files from disk, so you
 can re-run one alone):
@@ -15,6 +16,7 @@ can re-run one alone):
     survival    build_survival.py   kept trials -> episode-bin table
     leave_rule  leave_rule.py       per-fly time / fraction / value spread across patches
     figures     figures.py          the poster's figures (ATR tasks only)
+    learning_fatigue  learning_fatigue.py  dwell and locomotion slopes over the session (ATR only)
 
 Run:
     python pipeline.py --raw-root ~/Raw_data_by_task/"split line" --name split_line
@@ -30,11 +32,12 @@ import sys
 import build_survival
 import figures
 import leave_rule
+import learning_fatigue
 import selection
 import trials
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-STEPS = ("survival", "leave_rule", "figures")
+STEPS = ("survival", "leave_rule", "figures", "learning_fatigue")
 
 
 def tasks_found(raw_root, kind, dates=None):
@@ -70,6 +73,11 @@ def run_task(raw_root, task, kind, dates, out, steps, min_leaves):
     if "figures" in steps:
         if not figures.run(raw_root, task, kind, surv, os.path.join(out, "figures")):
             print("  figures: no ATR sessions for this task -- skipped")
+
+    if "learning_fatigue" in steps:
+        lf_out = os.path.join(out, "learning_fatigue")
+        if not learning_fatigue.run(raw_root, task, kind, surv, lf_out):
+            print("  learning_fatigue: no ATR sessions for this task -- skipped")
     return True
 
 

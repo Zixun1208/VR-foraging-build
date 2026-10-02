@@ -20,6 +20,7 @@ runs/<name>/<task tag>/        tag = decay seconds, e.g. 50_50, 20_100, 50_50_no
     survival.csv               episode-bin table, one row per patch visit per second
     leave_rule.csv/.png        per-fly across-patch spread of giving-up time/fraction/value
     figures/*.png              the poster's figures (ATR tasks only)
+    learning_fatigue/          per-fly slopes of dwell and locomotion over the session (ATR only)
 ```
 
 ## Steps
@@ -32,6 +33,7 @@ be re-run alone, e.g. `--steps figures` after changing `figures.py`.
 | `survival` | `build_survival.py` | kept trials -> episode-bin table; same columns as the earlier analysis's `survival*.csv` |
 | `leave_rule` | `leave_rule.py` | the variable with the smallest across-patch spread is the one the fly leaves by |
 | `figures` | `figures.py` | occupancy lines and heatmaps, speed, approach speed, FicTrac velocity, leave geometry, per-patch leave point, early/late dwell repeatability |
+| `learning_fatigue` | `learning_fatigue.py` | dwell, speed, moving fraction, stall and inter-patch speed against trial index; per-fly slopes, exact sign-flip and signed-rank tests, training vs probing, baseline reference (see `../learning_fatigue/README.md`) |
 
 Supporting: `selection.py` (finds sessions, reads kept-trial lists) and `trials.py` (trial and
 flash-log readers, task geometry parsed from the task folder name).

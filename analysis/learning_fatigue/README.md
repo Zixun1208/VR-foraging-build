@@ -3,7 +3,27 @@
 Plan for a follow-up to `selected_analysis`: does patch dwell change over a session, and if so
 is it fatigue or learning?
 
-Status: **planned, not built.** Nothing in this folder runs yet.
+Status: **built** as `selected_analysis/learning_fatigue.py`, the `learning_fatigue` pipeline
+step (`python pipeline.py ... --steps learning_fatigue`). Outputs land in
+`runs/<name>/<task tag>/learning_fatigue/`: `trials.csv`, `slopes.csv`, `summary.csv`,
+`baseline_reference.csv` and figures.
+
+First result on `split line` (12 flies, 50/50, ATR; slope per trial index within phase):
+
+- Dwell falls in training in 12/12 flies (mean -0.20 s/trial, exact p=0.0005, Holm 0.010).
+  In probing it falls in 11/12 but weakly (signed-rank p=0.034, Holm 0.27); one fly's late
+  stall makes the plain sign-flip on summed slopes meaningless there, so `summary.csv` also
+  gives `p_rank`.
+- Training minus probing dwell slope is not significant (p=0.22), so these data do not
+  separate a reward-specific fall from a general one.
+- Speed rises over the session in every fly, in both phases (p=0.0005 each), and moving
+  fraction rises while the longest stall shortens. That is not fatigue-like; it looks like
+  adaptation to the rig/corridor, with dwell shortening alongside faster walking.
+- Baseline/open-loop: this dataset has one baseline file per session and empty
+  `openloop_training/`, so the no-reward reference is thin.
+- Cohort and selection caveats below still apply; the cohort question is not tested here.
+
+Original plan follows.
 
 ## Why
 
