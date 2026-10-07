@@ -30,7 +30,7 @@ SHORT = {"past_50_50": "50/50", "past_50_50_nonatr": "non-ATR", "past_20_20": "2
          "split_line": "split line", "OO": "OO", "GO": "GO", "GG": "GG"}
 ATR_KEYS = ["past_50_50", "past_20_20", "past_20_100", "split_line", "OO", "GO", "GG"]
 BIG_KEYS = ["past_50_50", "past_50_50_nonatr"] + ATR_KEYS[1:]
-CROP = (0.695, 1.0)   # population-profile panel of the occupancy figures (fraction of height)
+CROP = (0.708, 1.0)   # population-profile panel of the occupancy figures (fraction of height)
 
 
 def run_text(tf, parts, size=14, color=INK, bold=False, font=BODY, align=None):
