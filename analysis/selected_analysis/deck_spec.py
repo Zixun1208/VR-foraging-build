@@ -15,7 +15,7 @@ import os
 from PIL import Image
 
 INK, TEAL, ORANGE, PURPLE = "12303A", "156F76", "D46638", "8A63B8"
-SHORT = {"past_50_50": "canonical 50/50", "past_50_50_nonatr": "no-ATR control", "past_20_20": "20/20", "past_20_100": "20/100",
+SHORT = {"past_50_50": "canonical", "past_50_50_nonatr": "no-ATR", "past_20_20": "20/20", "past_20_100": "20/100",
          "split_line": "split line", "OO": "OO", "GO": "GO", "GG": "GG"}
 ATR_KEYS = ["past_50_50", "split_line", "OO", "GO", "GG", "past_20_20", "past_20_100"]
 BIG_KEYS = ["past_50_50", "split_line", "OO", "GO", "GG", "past_20_20", "past_20_100", "past_50_50_nonatr"]
@@ -108,12 +108,12 @@ def slides(summ, figs):
                          ("Reward-active", True), ("fed ATR, so the LED reward works. No-ATR flies are the control.", False)]})
 
     out.append({"type": "cards", "title": "What the data say",
-                "cards": [("1", "Time at the patches", "Reward-active flies spend time at the patches in training, not in probing. Controls do not."),
-                          ("2", "Leaving on a timer", "Where the task can tell (20/100), 9 of 9 flies leave after a similar time."),
+                "cards": [("1", "Time at the patches", "Reward-active flies spend time at the patches in training, not in probing. Control flies do not."),
+                          ("2", "Leaving on a timer", "On the 20/100 task, 9 of 9 flies leave each patch after a similar time, not at a similar reward."),
                           ("3", "Change over a session", "Time in patch shortens and walking speeds up as the session goes on."),
                           ("4", "Cause", "Not specific to reward. Tiredness, learning and restlessness are not separated.")]})
 
-    out.append({"type": "image_stack", "title": "Time at the patches needs the reward to work",
+    out.append({"type": "image_stack", "title": "Reward-active flies linger at the patches",
                 "side": ["Reward-active flies peak at the patch entrances during training.", "Probing is close to flat.",
                          "No-ATR control flies show no peaks and spend less time inside the patches."],
                 "images": [(f("past_50_50__occupancy_training_probing.png"), "Canonical 50/50 task, reward-active (15 flies)", CROP),
@@ -125,7 +125,7 @@ def slides(summ, figs):
                                      ("Probing", [mean2(by[k], "probing") for k in BIG_KEYS])]},
                 "caption": "Median over flies of each fly's median visit, averaged over the two patches. Probing is shorter everywhere except GG."})
 
-    out.append({"type": "chart_image", "title": "Where the task can tell, flies leave on a timer",
+    out.append({"type": "chart_image", "title": "On the 20/100 task, flies leave after a similar time",
                 "chart": {"title": "Flies by the quantity most alike between their two patches", "cats": [SHORT[k] for k in ATR_KEYS],
                           "colors": [TEAL, ORANGE, PURPLE],
                           "series": [(n, [by[k]["leave_best"][key] for k in ATR_KEYS])

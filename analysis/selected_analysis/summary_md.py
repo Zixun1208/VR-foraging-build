@@ -36,11 +36,12 @@ TAKEAWAYS = [
     "(corridor position about 20 and 100). The exception is the OO line, whose peaks sit at the "
     "patch exits (about 40 and 122). Probing (reward off) is close to flat. The no-ATR control "
     "flies (3 flies) show no peaks and spend less time inside the patches.",
-    "**Flies leave on a timer, where the task can tell.** On the 20/100 task, the one task where "
-    "elapsed time, reward value and fraction of the start reward come apart, 9 of 9 flies were "
-    "most alike between their two patches in elapsed time (difference 0.24, against 1.66 for the "
-    "other two). On the 50/50 tasks time and fraction of the start reward cannot be told apart, so "
-    "'fraction' coming out first there says little.",
+    "**On the 20/100 task, flies leave each patch after a similar time.** The 20/100 task is the one "
+    "task where elapsed time, reward value and fraction of the start reward can be told apart, because "
+    "its patches run out after 20 s and 100 s. There, 9 of 9 flies were most alike between their two "
+    "patches in elapsed time (difference 0.24, against 1.66 for the other two). On the 50/50 tasks time "
+    "and fraction of the start reward cannot be told apart, so 'fraction' coming out closest there says "
+    "little. Reward value is ruled out on every task.",
     "**Time spent in a patch shortens and walking speeds up over a session.** Overall, across the "
     "four earlier reward-active datasets (44 flies), time in patch falls in 33 of 44 flies in "
     "training and 35 of 41 in probing, and speed rises in 38 of 44 and 37 of 41 (paired test: "
