@@ -151,7 +151,7 @@ def slides(summ, figs):
     out.append({"type": "stats", "title": "Time in a patch shortens just as much without reward",
                 "stats": [(f"{dt['n_negative']}/{dt['n']}", "flies shorten their time in patch in training", TEAL),
                           (f"{dp['n_negative']}/{dp['n']}", "flies shorten it in probing", ORANGE),
-                          (f"{dt['median_rel']:.1f} vs {dp['median_rel']:.1f}", "typical change, training vs probing", INK)],
+                          (f"{dt['median_rel']:.1f} vs {dp['median_rel']:.1f}", "median change, training vs probing", INK)],
                 "note": "Overall, over the canonical 50/50, split line, 20/20 and 20/100 datasets. The next slides show the figures dataset by dataset."})
 
     for title, fname, crop, cap in ANALYSES:

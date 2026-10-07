@@ -41,7 +41,7 @@ def build(raw_root, task, kind="recommended", dates=None):
             for name in s.kept[phase]:
                 path = os.path.join(s.sub_dir, phase, name)
                 meta = trials.parse_fname(path)
-                if meta and os.path.isfile(path):
+                if meta and os.path.isfile(path) and trials.trial_ok(path):
                     files.append((meta["ts"], phase, path))
         files.sort()
         n = len(files)

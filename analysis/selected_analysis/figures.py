@@ -53,7 +53,8 @@ class Ctx:
         named = [(trials.parse_fname(n)["ts"], n) for n in s.kept[phase]
                  if trials.parse_fname(n)]
         return [os.path.join(s.sub_dir, phase, n) for _, n in sorted(named)
-                if os.path.isfile(os.path.join(s.sub_dir, phase, n))]
+                if os.path.isfile(os.path.join(s.sub_dir, phase, n))
+                and trials.trial_ok(os.path.join(s.sub_dir, phase, n))]
 
     def save(self, fig, name):
         fig.savefig(os.path.join(self.out, name), dpi=200, bbox_inches="tight",
@@ -210,7 +211,7 @@ def example_flies(ctx, centers, prof):
 def fig_occupancy_heatmaps(ctx, centers, prof, mats):
     learner, rep = example_flies(ctx, centers, prof)
     ex = [("Example 1: fly that spent the most time in the patches during probing", learner),
-          ("Example 2: most typical fly", rep)]
+          ("Example 2: fly closest to the group average", rep)]
     data = {}
     for _, f in ex:
         for ph in PHASES:
@@ -480,8 +481,8 @@ def fig_repeatability(ctx, surv):
         ax.set_xlim(0, lim)
         ax.set_ylim(0, lim)
         style(ax)
-    fig.supxlabel("Typical time in patch, first half of session (s)", fontsize=14, y=0.015)
-    fig.supylabel("Typical time in patch, second half of session (s)", fontsize=14, x=0.012)
+    fig.supxlabel("Median time in patch, first half of session (s)", fontsize=14, y=0.015)
+    fig.supylabel("Median time in patch, second half of session (s)", fontsize=14, x=0.012)
     fig.subplots_adjust(left=.10, right=.98, top=.88, bottom=.22, wspace=.18)
     ctx.save(fig, "time_in_patch_repeatability.png")
     pd.concat({ph: t for ph, t in res.items()}, names=["phase"]).reset_index(0).to_csv(

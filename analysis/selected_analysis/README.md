@@ -59,6 +59,9 @@ nothing. Each module's own CLI still works standalone (`build_survival.py`, `lea
 
 ## Notes
 
+- Before anything else, trials that cannot be read, last under 5 s or over 900 s are dropped (`trials.trial_ok`): the
+  long ones are a stalled fly or a rig left running, and the earlier analysis dropped them too. About 1% of
+  trials, but 11 of one canonical fly's roughly 35 trials.
 - The original builders glob `training/*.csv` and never read the selection json; this one
   does. Kept trials get `qc_ok = 1`; `reached_end` still decides `left`.
 - `figures.py` skips what needs other tasks or model fits: the 20_100 panels, per-fly timer,

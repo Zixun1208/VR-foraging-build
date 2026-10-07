@@ -57,7 +57,7 @@ FIGS = [
     ("leave_rule_boxes.png", "The same comparison as box plots",
      "Only flies with at least 5 completed visits in each patch. Each dot is one fly."),
     ("figures/time_in_patch_repeatability.png", "Does a fly keep its place in the ranking?",
-     "Typical time in patch in the first half of the session against the second half. The dashed line means no change, so points below it are shorter later."),
+     "Median time in patch in the first half of the session against the second half. The dashed line means no change, so points below it are shorter later."),
     ("figures/reward_vs_control.png", "Reward-active flies against the no-ATR control",
      "Only for the earlier 50/50 task, the one dataset with a control of the same genotype. Bars are the average over flies with a 95% range, dots are single flies, the p value compares the two groups."),
     ("figures/model_comparison.png", "Predicting a new fly",

@@ -64,7 +64,7 @@ def build_design(raw_root, task, kind="recommended", dates=None) -> pd.DataFrame
             for name in s.kept[phase]:
                 path = os.path.join(s.sub_dir, phase, name)
                 meta = trials.parse_fname(path)
-                if meta and os.path.isfile(path):
+                if meta and os.path.isfile(path) and trials.trial_ok(path):
                     files.append((meta["ts"], phase, path))
         files.sort()
         prev = {0: np.nan, 1: np.nan}
@@ -281,7 +281,7 @@ def plot(per_fly, stats, A, stay, switches, out, n_flies):
     sx.set_title("How the switching model\nmoves between strategies", fontsize=12, weight="bold", pad=10)
     stay_pct = 100 * float(np.mean(np.diag(A)))
     sx.text(0.5, -0.30, f"On average {stay_pct:.0f}% of visits stay in the same strategy\n"
-            f"Typical stay: {stay.min():.0f}-{stay.max():.0f} visits\nMedian fly switches {switches:.0f} times per session",
+            f"Stay length: {stay.min():.0f}-{stay.max():.0f} visits\nMedian fly switches {switches:.0f} times per session",
             transform=sx.transAxes, ha="center", va="top", fontsize=10.5, color=INK, linespacing=1.3)
     fig.subplots_adjust(left=0.1, right=0.98, top=0.86, bottom=0.30)
     fig.savefig(out, dpi=200, bbox_inches="tight", facecolor="white")

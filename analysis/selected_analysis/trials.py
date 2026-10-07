@@ -6,6 +6,7 @@ here are comparable with the existing ones.
 from __future__ import annotations
 
 import csv
+import functools
 import os
 import re
 
@@ -13,6 +14,8 @@ import numpy as np
 
 REACHED_END_X = 125.0   # X >= this counts the traversal as completed
 MAX_GAP_SEC = 2.0       # dt above this is a pause/rollover, not a real frame interval
+MIN_TRIAL_SEC = 5.0     # shorter trials are truncated or degenerate
+MAX_TRIAL_SEC = 900.0   # longer trials are a stalled fly or a rig left running (as in the earlier analysis)
 
 FNAME_RE = re.compile(
     r"^(?P<phase>training|probing)_iter_(?P<iter>\d+)_trial_(?P<trial>\d+)_"
@@ -69,6 +72,19 @@ def load_trajectory(path: str):
         return None
     t = np.asarray(ts) / 1000.0
     return t - t[0], np.asarray(xs)
+
+
+@functools.lru_cache(maxsize=None)
+def trial_seconds(path: str):
+    """Trial length in seconds (sum of the cleaned frame intervals), or None if unreadable."""
+    traj = load_trajectory(path)
+    return None if traj is None else float(sample_dt(traj[0]).sum())
+
+
+def trial_ok(path: str) -> bool:
+    """False for unreadable trials and for ones outside MIN_TRIAL_SEC..MAX_TRIAL_SEC."""
+    sec = trial_seconds(path)
+    return sec is not None and MIN_TRIAL_SEC <= sec <= MAX_TRIAL_SEC
 
 
 def sample_dt(t):

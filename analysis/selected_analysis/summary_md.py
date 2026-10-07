@@ -43,8 +43,8 @@ TAKEAWAYS = [
     "'fraction' coming out first there says little.",
     "**Time spent in a patch shortens and walking speeds up over a session.** Overall, across the "
     "four earlier reward-active datasets (44 flies), time in patch falls in 33 of 44 flies in "
-    "training and 33 of 42 in probing, and speed rises in 35 of 44 and 37 of 42 (paired test: "
-    "p < 0.001 for speed and for probing, p = 0.005 for time in patch in training). The three 1D "
+    "training and 35 of 41 in probing, and speed rises in 38 of 44 and 37 of 41 (paired test: "
+    "p < 0.001 for all four). The three 1D "
     "lines show the same (speed rises in 23 of 26 flies).",
     "**The shortening is not specific to reward.** It is at least as large in probing, where no "
     "reward is given, as in training. That fits a general change in the fly over the session "
@@ -69,6 +69,8 @@ CAVEATS = [
     "The earlier experiments use the selection saved in each session folder. It carries no ATR "
     "label, so the no-ATR controls are identified only by folder name, and the 1D lines were "
     "assumed to be fed ATR.",
+    "Trials longer than 900 s (a stalled fly or a rig left running) are dropped, as in the earlier "
+    "analysis. That is about 1% of trials, but it removes 11 of one canonical fly's roughly 35 trials.",
     "Three trial files in the earlier 50/50 data could not be read (input/output error) and were "
     "skipped. If that disk is unreliable, those sessions may be incomplete.",
     "Ball-tracking figures are missing for most datasets: no session has ball-tracking "
@@ -143,7 +145,7 @@ def tables(summ):
     names = {"earlier_atr": "overall, 50/50, 20/20, 20/100 and split line", "lines_1d": "overall, OO, GO and GG"}
     metric = {"dwell": "time in patch", "speed": "speed", "moving_frac": "fraction of time walking",
               "longest_stall": "longest pause"}
-    t3 = ["| flies | phase | quantity | flies | rising / falling | typical change (fraction of the fly's usual value) | p |", "|---|---|---|---|---|---|---|"]
+    t3 = ["| flies | phase | quantity | flies | rising / falling | median change (fraction of the fly's usual value) | p |", "|---|---|---|---|---|---|---|"]
     for pool, res in summ["pools"].items():
         for key, x in res.items():
             m, ph = key.rsplit("_", 1)
