@@ -32,19 +32,25 @@ be re-run alone, e.g. `--steps figures` after changing `figures.py`.
 |---|---|---|
 | `survival` | `build_survival.py` | kept trials -> episode-bin table; same columns as the earlier analysis's `survival*.csv` |
 | `leave_rule` | `leave_rule.py` | the variable with the smallest across-patch spread is the one the fly leaves by |
-| `figures` | `figures.py` | occupancy lines and heatmaps, speed, approach speed, FicTrac velocity, leave geometry, per-patch leave point, early/late dwell repeatability |
+| `figures` | `figures.py` | time at each position (lines and heatmaps), speed, approach speed, FicTrac velocity, how the reward runs out, when flies leave each patch, early vs late time in patch |
 | `learning_fatigue` | `learning_fatigue.py` | dwell, speed, moving fraction, stall and inter-patch speed against trial index; per-fly slopes, exact sign-flip and signed-rank tests, training vs probing, baseline reference (see `../learning_fatigue/README.md`) |
 
 Supporting: `selection.py` (finds sessions, reads kept-trial lists) and `trials.py` (trial and
 flash-log readers, task geometry parsed from the task folder name).
 
-Across datasets (run the pipeline on each first; outputs go to `runs/summary/`):
+Poster figures for every dataset, and across datasets (run the pipeline on each dataset first):
 
+- `pipeline.py` also makes the poster's per-fly "which quantity matches" box plot
+  (`leave_rule_boxes.png`) and, with 5+ flies, the model comparison `figures/model_comparison.png`
+  (`models.py`: shared rule, switching strategies, fixed fly differences, slowly changing; the
+  switching and drifting code is vendored in `glmhmm.py` and `drift.py`)
+- `reward_effect.py` reward-active flies against the no-ATR control (50/50 task only)
 - `stage_lines.py` stages a `<line>/sub-N/` dataset as `<date>/<task>/<sub>/` with symlinks
-- `report.py` one self-contained HTML comparing several runs
-- `summary_stats.py` -> `summary_md.py` -> `make_slides.py` writes `summary.json`,
-  `foraging_summary.md` (with `figs/`) and `foraging_summary.pptx`; the prose in the last two
-  is written by hand against the numbers, so re-read it after new data
+- `summary_stats.py` -> `summary_md.py` / `make_slides.py` / `slides_pdf.py` / `gallery.py` write
+  `summary.json`, `foraging_summary.md`, `foraging_summary.pptx`, `foraging_summary.pdf` and
+  `all_figures.pdf` (every figure for every dataset) into `runs/summary/`. Slide content is in
+  `deck_spec.py`; the prose there and in `summary_md.py` is written by hand against the numbers, so
+  re-read it after new data. The PDFs use headless Chromium, which cannot write to hidden folders.
 
 Other flags: `--dates D [D ...]`, `--min-leaves N` (visits per patch for a fly to enter
 `leave_rule`, default 3), `--out-root`, and `--dry-run` to list what would run and write

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Does patch dwell change over a session, and is it fatigue or learning?
+"""Does the time spent in a patch change over a session, and is it fatigue or learning?
 
 Plan: ../learning_fatigue/README.md. Reads the survival table for per-visit dwell and the
 selected trial CSVs for locomotion, then fits one slope per fly against session position.
@@ -40,8 +40,10 @@ GRID_DT = 0.25          # s, resampling grid for speed
 MOVE_SPEED = 0.5        # corridor units/s; below this the fly counts as stalled
 METRICS = ("dwell", "speed", "moving_frac", "longest_stall", "traverse_speed")
 LABELS = {"dwell": "Time spent in patch (s)", "speed": "Mean speed (units/s)",
-          "moving_frac": "Moving fraction", "longest_stall": "Longest stall (s)",
+          "moving_frac": "Fraction of time walking", "longest_stall": "Longest pause (s)",
           "traverse_speed": "Speed between patches (units/s)"}
+PLAIN = {"dwell": "time in patch", "speed": "speed", "moving_frac": "fraction of time walking",
+         "longest_stall": "longest pause"}
 MIN_TRIALS = 8          # trials with a value before a fly gets a slope
 
 
@@ -198,8 +200,8 @@ def fig_over_session(ctx, tt, metrics, name):
             if ax is axes[i][0]:
                 ax.set_ylabel(LABELS[m], fontsize=11)
     for ax in axes[-1]:
-        ax.set_xlabel("Trial index within phase", fontsize=12)
-    fig.suptitle("thin: fly (5-trial running mean)   bold: mean across flies", fontsize=10,
+        ax.set_xlabel("Trial number within training / probing", fontsize=12)
+    fig.suptitle("thin lines: single flies (5-trial running average)   bold: average over flies", fontsize=10,
                  color=INK)
     fig.tight_layout()
     ctx.save(fig, name)
@@ -222,18 +224,18 @@ def fig_slope_compare(ctx, sl, summ):
         row = summ[(summ.metric == m) & (summ.patch == patch) &
                    (summ.test == "training-probing")]
         if len(row):
-            ax.set_title(f"{m}\ndiff p={row.p.iloc[0]:.3f} {stars(row.p.iloc[0])}", fontsize=10)
+            ax.set_title(f"{PLAIN[m]}\ntraining vs probing p={row.p.iloc[0]:.3f} {stars(row.p.iloc[0])}", fontsize=10)
         ax.set_xticks([0, 1], ["train", "probe"])
         ax.set_xlim(-0.4, 1.4)
         style(ax, 11)
-    axes[0].set_ylabel("Change across the phase", fontsize=12)
+    axes[0].set_ylabel("Change over the session", fontsize=12)
     fig.tight_layout()
     ctx.save(fig, "slope_training_vs_probing.png")
 
 
 def fig_baseline(ctx, ref):
-    cols = [("baseline_moving_frac", "baseline"), ("training_first10_moving_frac", "first 10"),
-            ("training_last10_moving_frac", "last 10")]
+    cols = [("baseline_moving_frac", "baseline"), ("training_first10_moving_frac", "first 10 trials"),
+            ("training_last10_moving_frac", "last 10 trials")]
     y = ref[[c for c, _ in cols]].to_numpy(float)
     if np.isnan(y).all():
         return
@@ -244,8 +246,8 @@ def fig_baseline(ctx, ref):
     ax.scatter(np.tile(x, (len(y), 1)), y, color=COLORS["training"], s=26, zorder=2)
     ax.plot(x, pd.DataFrame(y).mean().to_numpy(), color="k", lw=2.4, zorder=3)
     ax.set_xticks(x, [lab for _, lab in cols])
-    ax.set_ylabel("Moving fraction", fontsize=12)
-    ax.set_title("Walking without reward vs training trials", fontsize=10)
+    ax.set_ylabel("Fraction of time walking", fontsize=12)
+    ax.set_title("Walking with no reward vs the first and last training trials", fontsize=10)
     style(ax, 11)
     ctx.save(fig, "baseline_vs_training.png")
 
@@ -262,7 +264,7 @@ def run(raw_root, task, kind, survival_csv, out):
     for name, df in (("trials", tt), ("slopes", sl), ("summary", summ),
                      ("baseline_reference", ref)):
         df.to_csv(os.path.join(out, f"{name}.csv"), index=False)
-    fig_over_session(ctx, tt, ["dwell"], "dwell_over_session.png")
+    fig_over_session(ctx, tt, ["dwell"], "time_in_patch_over_session.png")
     fig_over_session(ctx, tt, ["speed", "moving_frac", "longest_stall"],
                      "locomotion_over_session.png")
     if not summ.empty:

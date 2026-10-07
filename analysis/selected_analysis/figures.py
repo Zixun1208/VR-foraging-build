@@ -179,14 +179,14 @@ def fig_occupancy_lines(ctx, centers, prof):
         for y in lines:
             ax.plot(centers, y, color=COLORS[ph], alpha=0.24, lw=1.25)
         ax.plot(centers, np.nanmean(lines, 0), color=INK, lw=3.0)
-        ax.set_ylabel("Occupancy (%)", fontsize=16)
+        ax.set_ylabel("Time at position (% of trial)", fontsize=16)
         ax.set_title(ph, loc="left", weight="bold", color=COLORS[ph], fontsize=17)
         ax.set_xlim(0, ctx.corridor)
         style(ax)
     axes[-1].set_xlabel("Corridor position", fontsize=16)
     axes[0].text(0.99, 0.88, f"n={len(prof)} flies", transform=axes[0].transAxes,
                  ha="right", va="top", fontsize=15, color=INK)
-    fig.suptitle("Population occupancy profiles across corridor position", fontsize=20,
+    fig.suptitle("Where flies spend their time along the corridor", fontsize=20,
                  weight="bold", y=0.98)
     ctx.save(fig, "occupancy_per_fly_lines.png")
 
@@ -209,8 +209,8 @@ def example_flies(ctx, centers, prof):
 
 def fig_occupancy_heatmaps(ctx, centers, prof, mats):
     learner, rep = example_flies(ctx, centers, prof)
-    ex = [("Example 1: strongest patch occupancy during probing", learner),
-          ("Example 2: most representative fly", rep)]
+    ex = [("Example 1: fly that spent the most time in the patches during probing", learner),
+          ("Example 2: most typical fly", rep)]
     data = {}
     for _, f in ex:
         for ph in PHASES:
@@ -240,7 +240,7 @@ def fig_occupancy_heatmaps(ctx, centers, prof, mats):
                 ax.set_ylabel("trial", fontsize=13)
             if r == 2:
                 ax.set_xlabel("Corridor position", fontsize=13)
-    fig.colorbar(img, cax=fig.add_subplot(gs[1:4, 2]), label="occupancy per trial (%)")
+    fig.colorbar(img, cax=fig.add_subplot(gs[1:4, 2]), label="time at position per trial (%)")
     ax = fig.add_subplot(gs[4, :])
     shade(ax, ctx)
     for ph in PHASES:
@@ -250,8 +250,8 @@ def fig_occupancy_heatmaps(ctx, centers, prof, mats):
         ax.plot(centers, np.nanmean(lines, 0), color=COLORS[ph], lw=2.8, label=f"{ph} mean")
     ax.set_xlim(0, ctx.corridor)
     ax.set_xlabel("Corridor position", fontsize=15)
-    ax.set_ylabel("occupancy (%)", fontsize=15)
-    ax.set_title(f"Population occupancy profiles (n = {len(prof)})", fontsize=16, weight="bold", pad=14)
+    ax.set_ylabel("time at position (% of trial)", fontsize=15)
+    ax.set_title(f"Where flies spend their time (n = {len(prof)} flies)", fontsize=16, weight="bold", pad=14)
     ax.legend(frameon=False, fontsize=13, loc="upper right")
     style(ax)
     ctx.save(fig, "occupancy_training_probing.png")
@@ -272,7 +272,7 @@ def fig_occupancy_heatmaps(ctx, centers, prof, mats):
         ax.set_xlabel("Corridor position")
     axes[0].set_ylabel("Trial")
     fig.colorbar(img, ax=axes, label="Frames per bin (log)", shrink=0.82, pad=0.02)
-    fig.suptitle(f"Example occupancy heatmaps: {learner}", fontsize=18, weight="bold", y=1.02)
+    fig.suptitle(f"Example fly: time at each position, trial by trial ({learner})", fontsize=18, weight="bold", y=1.02)
     ctx.save(fig, "occupancy_example_heatmaps.png")
 
 
@@ -289,9 +289,9 @@ def fig_speed(ctx):
             ax.plot(centers, y, color=COLORS[ph], alpha=0.16, lw=1.1)
         ax.plot(centers, np.nanmean(lines, 0), color=COLORS[ph], lw=3.0, label=f"{ph} mean")
     ax.set_xlim(0, ctx.corridor)
-    ax.set_title("Population speed across corridor position", fontsize=20, weight="bold")
+    ax.set_title("Walking speed along the corridor", fontsize=20, weight="bold")
     ax.set_xlabel("Corridor position", fontsize=15)
-    ax.set_ylabel("Absolute speed\n(corridor units/s)", fontsize=14)
+    ax.set_ylabel("Speed\n(corridor units/s)", fontsize=14)
     ax.legend(frameon=False, fontsize=13, loc="upper right")
     style(ax)
     ctx.save(fig, "speed_by_position.png")
@@ -380,7 +380,7 @@ def fig_fictrac(ctx):
         ax.set_ylabel(f"{labels[k]}\n(rad/s)", fontsize=14)
         ax.set_xlim(0, ctx.corridor)
         style(ax)
-    axes[0].set_title(f"Population FicTrac velocity across corridor position (n={len(out)})",
+    axes[0].set_title(f"Walking velocity measured from the ball along the corridor (n={len(out)} flies)",
                       fontsize=19, weight="bold")
     axes[0].legend(frameon=False, fontsize=12, loc="upper right")
     axes[-1].set_xlabel("corridor position", fontsize=15)
@@ -402,7 +402,7 @@ def fig_geometry(ctx):
     ax.set_xlabel("Time in patch (s)", fontsize=14)
     ax.set_ylabel("LED reward (V)", fontsize=14)
     p0, p1 = ctx.patches[0], ctx.patches[1]
-    ax.set_title(f"{p0['start_volt']}/{p1['start_volt']} V, {p0['decay_s']:.0f}/{p1['decay_s']:.0f} s",
+    ax.set_title(f"Reward starts at {p0['start_volt']}/{p1['start_volt']} V, runs out in {p0['decay_s']:.0f}/{p1['decay_s']:.0f} s",
                  weight="bold", color=BLUE, fontsize=14)
     ax.legend(handles=[plt.Line2D([0], [0], color=BLUE, lw=3, label="Patch 1"),
                        plt.Line2D([0], [0], color=BLUE, lw=3, ls="--", label="Patch 2")],
@@ -415,8 +415,8 @@ def fig_dissociation(ctx, surv):
     left = surv[(surv.phase == "training") & (surv.left == 1)]
     p0, p1 = ctx.patches[0], ctx.patches[1]
     labels = [f"patch 1\n{p0['start_volt']} V", f"patch 2\n{p1['start_volt']} V"]
-    specs = [("t_bin", "Time spent (s)"), ("value_volts", "End value (V)"),
-             ("value_frac", "End fraction")]
+    specs = [("t_bin", "Time spent in patch (s)"), ("value_volts", "Reward left on leaving (V)"),
+             ("value_frac", "Fraction of start reward left")]
     fig, axes = plt.subplots(1, 3, figsize=(10.8, 4.2), gridspec_kw={"wspace": 0.34})
     for ax, (col, ylab) in zip(axes, specs):
         tab = left.groupby(["fly_id", "patch"])[col].median().unstack().dropna()
@@ -434,7 +434,7 @@ def fig_dissociation(ctx, surv):
         ax.set_xticks([0, 1], labels, fontsize=12)
         ax.set_ylabel(ylab, fontsize=14)
         style(ax, 12)
-    fig.suptitle(f"Leave point by patch (n={left.fly_id.nunique()} flies)", fontsize=19,
+    fig.suptitle(f"When flies leave each patch (n={left.fly_id.nunique()} flies)", fontsize=19,
                  weight="bold", color=BLUE)
     ctx.save(fig, "dissociation.png")
 
@@ -446,7 +446,7 @@ def spearman(x, y):
 def fig_repeatability(ctx, surv):
     """Early- vs late-session median dwell per fly (first vs second half of trials)."""
     d = surv.copy()
-    d["dwell"] = d.groupby("visit_id").t_bin.transform("max")
+    d["time_in_patch"] = d.groupby("visit_id").t_bin.transform("max")
     d = d.drop_duplicates("visit_id")
     rng = np.random.default_rng(0)
     res = {}
@@ -454,7 +454,7 @@ def fig_repeatability(ctx, surv):
         rows = []
         for fly, g in d[d.phase == ph].groupby("fly_id"):
             cut = g.trial_order.median()
-            e, l = g[g.trial_order <= cut].dwell, g[g.trial_order > cut].dwell
+            e, l = g[g.trial_order <= cut].time_in_patch, g[g.trial_order > cut].time_in_patch
             if len(e) >= 3 and len(l) >= 3:
                 rows.append((fly, e.median(), l.median()))
         res[ph] = pd.DataFrame(rows, columns=["fly_id", "early", "late"])
@@ -474,18 +474,18 @@ def fig_repeatability(ctx, surv):
         xs = np.linspace(t.early.min(), t.early.max(), 100)
         ax.plot(xs, np.polyval(c, xs), color=COLORS[ph], lw=2.6)
         ax.plot([0, lim], [0, lim], color=INK, lw=1.2, ls="--")
-        ax.text(.04, .95, f"Spearman rho={ps[ph][0]:.2f}\nHolm p{fmt_p(holm[ph])}  {stars(holm[ph])}",
+        ax.text(.04, .95, f"rank correlation = {ps[ph][0]:.2f}\ncorrected p{fmt_p(holm[ph])}  {stars(holm[ph])}",
                 transform=ax.transAxes, va="top", fontsize=12, weight="bold")
         ax.set_title(ph.capitalize(), color=COLORS[ph], weight="bold")
         ax.set_xlim(0, lim)
         ax.set_ylim(0, lim)
         style(ax)
-    fig.supxlabel("Early-session median time spent (s)", fontsize=14, y=0.015)
-    fig.supylabel("Late-session median time spent (s)", fontsize=14, x=0.012)
+    fig.supxlabel("Typical time in patch, first half of session (s)", fontsize=14, y=0.015)
+    fig.supylabel("Typical time in patch, second half of session (s)", fontsize=14, x=0.012)
     fig.subplots_adjust(left=.10, right=.98, top=.88, bottom=.22, wspace=.18)
-    ctx.save(fig, "dwell_repeatability.png")
+    ctx.save(fig, "time_in_patch_repeatability.png")
     pd.concat({ph: t for ph, t in res.items()}, names=["phase"]).reset_index(0).to_csv(
-        os.path.join(ctx.out, "dwell_repeatability_by_fly.csv"), index=False)
+        os.path.join(ctx.out, "time_in_patch_repeatability_by_fly.csv"), index=False)
 
 
 def run(raw_root, task, kind, survival_csv, out):

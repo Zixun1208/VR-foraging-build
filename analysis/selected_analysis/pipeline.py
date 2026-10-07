@@ -16,7 +16,9 @@ can re-run one alone):
     survival    build_survival.py   kept trials -> episode-bin table
     leave_rule  leave_rule.py       per-fly time / fraction / value spread across patches
     figures     figures.py          the poster's figures (ATR tasks only)
-    learning_fatigue  learning_fatigue.py  dwell and locomotion slopes over the session (ATR only)
+    learning_fatigue  learning_fatigue.py  time in patch and walking over the session (ATR only)
+    models      models.py           predicting a new fly: shared / switching / fixed / changing models
+                                    (needs 5+ flies; the poster's model comparison)
 
 Run:
     python pipeline.py --raw-root ~/Raw_data_by_task/"split line" --name split_line
@@ -33,11 +35,12 @@ import build_survival
 import figures
 import leave_rule
 import learning_fatigue
+import models
 import selection
 import trials
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-STEPS = ("survival", "leave_rule", "figures", "learning_fatigue")
+STEPS = ("survival", "leave_rule", "figures", "learning_fatigue", "models")
 
 
 def tasks_found(raw_root, kind, dates=None):
@@ -78,6 +81,13 @@ def run_task(raw_root, task, kind, dates, out, steps, min_leaves):
         lf_out = os.path.join(out, "learning_fatigue")
         if not learning_fatigue.run(raw_root, task, kind, surv, lf_out):
             print("  learning_fatigue: no ATR sessions for this task -- skipped")
+
+    if "models" in steps:
+        res = models.run(raw_root, task, kind, os.path.join(out, "figures"), dates=dates)
+        if res is None:
+            print(f"  models: fewer than {models.MIN_FLIES} flies -- skipped")
+        else:
+            print("  models: bits per visit " + ", ".join(f"{m} {res.loc[m, 'mean']:+.2f}" for m in models.MODELS))
     return True
 
 

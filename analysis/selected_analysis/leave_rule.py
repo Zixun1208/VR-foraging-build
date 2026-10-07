@@ -64,14 +64,46 @@ def plot(res: pd.DataFrame, out: str, title: str) -> None:
     for i, n in enumerate(names):
         ax.scatter(np.full(len(res), i), res[f"{n}_spread"], color=COLORS[n], s=22, zorder=2)
     ax.plot(range(3), [res[f"{n}_spread"].median() for n in names], color="k", lw=2, zorder=3)
-    ax.set_xticks(range(3), names)
-    ax.set_ylabel("across-patch spread |p1-p2| / mean")
-    ax.set_title(f"{title}\n{(res.best == 'time').sum()}/{len(res)} flies most consistent in time",
+    ax.set_xticks(range(3), ["time in\npatch", "fraction of\nstart reward", "reward\nvalue"])
+    ax.set_ylabel("difference between the two patches\n|patch 1 - patch 2| / average")
+    ax.set_title(f"{(res.best == 'time').sum()}/{len(res)} flies most similar in time between patches",
                  fontsize=10)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
     fig.savefig(out, dpi=200, bbox_inches="tight", facecolor="white")
     plt.close(fig)
+
+
+def plot_boxes(df: pd.DataFrame, out: str, min_leaves: int = 5) -> bool:
+    """The poster's per-fly view: spread of each quantity across the two patches, as box plots."""
+    res = per_fly(df, min_leaves)
+    if len(res) < 3:
+        return False
+    names = list(VARS.values())
+    data = [res[f"{n}_spread"].to_numpy() for n in names]
+    fig, ax = plt.subplots(figsize=(6.2, 4.6))
+    box = ax.boxplot(data, patch_artist=True, showfliers=False, widths=0.58)
+    for patch, n in zip(box["boxes"], names):
+        patch.set_facecolor(COLORS[n])
+        patch.set_alpha(0.32)
+        patch.set_edgecolor("#1b2a2f")
+        patch.set_linewidth(1.5)
+    for med in box["medians"]:
+        med.set_color("#1b2a2f")
+        med.set_linewidth(2.2)
+    for i, vals in enumerate(data, start=1):
+        ax.scatter(np.full(len(vals), i) + np.linspace(-0.14, 0.14, len(vals)), vals, s=40,
+                   color="#1b2a2f", alpha=0.68, zorder=3)
+    ax.set_xticks([1, 2, 3], ["time in\npatch", "fraction of\nstart reward", "reward\nvalue"])
+    ax.set_ylabel("difference between the two patches\n|patch 1 - patch 2| / average")
+    ax.set_ylim(0, max(max(d) for d in data) * 1.18)
+    ax.set_title(f"Within each fly, which quantity matches across the two patches? (n = {len(res)} flies)",
+                 fontsize=10, weight="bold", pad=12)
+    for sp in ("top", "right"):
+        ax.spines[sp].set_visible(False)
+    fig.savefig(out, dpi=200, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    return True
 
 
 def run(csv_path: str, out: str, min_leaves: int = 3, name: str | None = None):
@@ -87,6 +119,7 @@ def run(csv_path: str, out: str, min_leaves: int = 3, name: str | None = None):
     os.makedirs(out, exist_ok=True)
     res.to_csv(os.path.join(out, f"{name}.csv"), index=False)
     plot(res, os.path.join(out, f"{name}.png"), tag)
+    plot_boxes(pd.read_csv(csv_path), os.path.join(out, f"{name}_boxes.png"))
     return res
 
 
