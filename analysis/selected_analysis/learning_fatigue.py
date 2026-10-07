@@ -110,12 +110,15 @@ def slope(x, y):
 
 
 def slope_table(tt):
-    """Per fly x phase x metric(/patch) slope against trial index within the phase."""
+    """Per fly x phase x metric(/patch) slope against position in the phase (0 = first trial,
+    1 = last), i.e. the change across the whole phase."""
     series = [("dwell", "both", "dwell"), ("dwell", "p1", "dwell_p1"),
               ("dwell", "p2", "dwell_p2")] + [(m, "all", m) for m in METRICS[1:]]
     rows = []
     for (fly, ph), g in tt.groupby(["fly_id", "phase"]):
-        x = g.phase_index.to_numpy(float)
+        # position as a fraction of the phase, so a slope is the change across the whole
+        # phase and training (60 trials) and probing (20 in some datasets) are comparable
+        x = g.phase_index.to_numpy(float) / max(g.phase_index.max(), 1)
         for metric, patch, col in series:
             y = g[col].to_numpy(float)
             b, n = slope(x, y)
@@ -223,7 +226,7 @@ def fig_slope_compare(ctx, sl, summ):
         ax.set_xticks([0, 1], ["train", "probe"])
         ax.set_xlim(-0.4, 1.4)
         style(ax, 11)
-    axes[0].set_ylabel("Slope per trial", fontsize=12)
+    axes[0].set_ylabel("Change across the phase", fontsize=12)
     fig.tight_layout()
     ctx.save(fig, "slope_training_vs_probing.png")
 
@@ -239,7 +242,7 @@ def fig_baseline(ctx, ref):
     for r in y:
         ax.plot(x, r, color="#b8c2c0", lw=0.9, zorder=1)
     ax.scatter(np.tile(x, (len(y), 1)), y, color=COLORS["training"], s=26, zorder=2)
-    ax.plot(x, np.nanmean(y, axis=0), color="k", lw=2.4, zorder=3)
+    ax.plot(x, pd.DataFrame(y).mean().to_numpy(), color="k", lw=2.4, zorder=3)
     ax.set_xticks(x, [lab for _, lab in cols])
     ax.set_ylabel("Moving fraction", fontsize=12)
     ax.set_title("Walking without reward vs training trials", fontsize=10)
