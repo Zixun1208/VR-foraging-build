@@ -5,7 +5,7 @@ Wording is plain on purpose ("time spent in patch", "overall"). The text is writ
 against the numbers in summary.json (or filled from it), so re-read it after new data.
 
 Layout of the deck: a few summary slides across all datasets, then every analysis shown twice,
-once with the 50/50 task and the split line side by side, once with the OO, GO and GG
+once with the 50/50 task, the 20/100 task and the split line side by side, once with the OO, GO and GG
 lines side by side (``image_grid`` slides).
 """
 from __future__ import annotations
@@ -17,10 +17,10 @@ from PIL import Image
 INK, TEAL, ORANGE, PURPLE = "12303A", "156F76", "D46638", "8A63B8"
 SHORT = {"past_50_50": "50/50", "past_50_50_nonatr": "no-ATR", "past_20_20": "20/20", "past_20_100": "20/100",
          "split_line": "split line", "OO": "OO", "GO": "GO", "GG": "GG"}
-ATR_KEYS = ["past_50_50", "split_line", "OO", "GO", "GG", "past_20_20", "past_20_100"]
-BIG_KEYS = ["past_50_50", "split_line", "OO", "GO", "GG", "past_20_20", "past_20_100", "past_50_50_nonatr"]
+ATR_KEYS = ["past_50_50", "past_20_100", "split_line", "OO", "GO", "GG", "past_20_20"]
+BIG_KEYS = ["past_50_50", "past_20_100", "split_line", "OO", "GO", "GG", "past_20_20", "past_50_50_nonatr"]
 CROP = (0.708, 1.0)   # the "everyone together" panel at the bottom of the occupancy figure
-GROUPS = [("50/50 task and split line", ["past_50_50", "split_line"]),
+GROUPS = [("50/50 task, 20/100 task and split line", ["past_50_50", "past_20_100", "split_line"]),
           ("OO, GO and GG lines", ["OO", "GO", "GG"])]
 # title, figure file (after the "<key>__" prefix), crop, kind of caption
 ANALYSES = [
@@ -102,9 +102,9 @@ def slides(summ, figs):
     out.append({"type": "bar_h", "title": f"Ten datasets, {n_flies} flies",
                 "chart": {"title": "Flies per dataset", "cats": [clean(d) for d in summ["datasets"]],
                           "series": [("Flies", [d["flies"] for d in summ["datasets"]])], "colors": [TEAL]},
-                "side": [("50/50 task and split line", True), ("The earlier 50/50 task and the split line, same task", False),
+                "side": [("50/50, 20/100 and split line", True), ("The 50/50 and 20/100 tasks are Gr64f flies; the split line runs the 50/50 task", False),
                          ("1D lines", True), ("OO, GO and GG: the same task in three lines", False),
-                         ("Other tasks", True), ("20/20, 20/100 and 60/100", False),
+                         ("Other tasks", True), ("20/20 and 60/100", False),
                          ("Reward-active", True), ("fed ATR, so the LED reward works. No-ATR flies are the control.", False)]})
 
     out.append({"type": "cards", "title": "What the data say",
