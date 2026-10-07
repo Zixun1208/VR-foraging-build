@@ -40,8 +40,10 @@ TAKEAWAYS = [
     "task where elapsed time, reward value and fraction of the start reward can be told apart, because "
     "its patches run out after 20 s and 100 s. There, 9 of 9 flies were most alike between their two "
     "patches in elapsed time (difference 0.24, against 1.66 for the other two). On the 50/50 tasks time "
-    "and fraction of the start reward cannot be told apart, so 'fraction' coming out closest there says "
-    "little. Reward value is ruled out on every task.",
+    "and fraction of the start reward are nearly the same thing, so which one comes out closest for a "
+    "fly depends on how long it stays, not on what it goes by: a fly that leaves early has a fraction "
+    "near 1 in both patches, which makes the patches look alike, while flies that leave late or "
+    "stay exactly as long in both patches favour time. Reward value is ruled out on every task.",
     "**Time spent in a patch shortens and walking speeds up over a session.** Overall, across the "
     "four earlier reward-active datasets (44 flies), time in patch falls in 33 of 44 flies in "
     "training and 35 of 41 in probing, and speed rises in 38 of 44 and 37 of 41 (paired test: "
@@ -71,7 +73,7 @@ CAVEATS = [
     "label, so the no-ATR controls are identified only by folder name, and the 1D lines were "
     "assumed to be fed ATR.",
     "Trials longer than 900 s (a stalled fly or a rig left running) are dropped, as in the earlier "
-    "analysis. That is about 1% of trials, but it removes 11 of one canonical fly's roughly 35 trials.",
+    "analysis. That is about 1% of trials, but it removes 11 of one 50/50-task fly's roughly 35 trials.",
     "Three trial files in the earlier 50/50 data could not be read (input/output error) and were "
     "skipped. If that disk is unreliable, those sessions may be incomplete.",
     "Ball-tracking figures are missing for most datasets: no session has ball-tracking "

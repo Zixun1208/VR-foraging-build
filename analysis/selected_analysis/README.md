@@ -61,14 +61,14 @@ nothing. Each module's own CLI still works standalone (`build_survival.py`, `lea
 
 - Before anything else, trials that cannot be read, last under 5 s or over 900 s are dropped (`trials.trial_ok`): the
   long ones are a stalled fly or a rig left running, and the earlier analysis dropped them too. About 1% of
-  trials, but 11 of one canonical fly's roughly 35 trials.
+  trials, but 11 of one 50/50-task fly's roughly 35 trials.
 - The original builders glob `training/*.csv` and never read the selection json; this one
   does. Kept trials get `qc_ok = 1`; `reached_end` still decides `left`.
 - `figures.py` skips what needs other tasks or model fits: the 20_100 panels, per-fly timer,
   non-ATR reward effect, GLM comparison. Its statistics (exact paired sign-flip, permutation
   Spearman, bootstrap CI) are computed in the script, not read from precomputed files, so
   p-values are not directly comparable with the poster's.
-- On the 50/50 canonical task time and fraction of start value are confounded by design, so
+- On the 50/50 task time and fraction of start value are confounded by design, so
   `leave_rule` can't separate them there; the 20_100 task does.
 - `leave_rule.py` on the earlier 9-fly 20_100 table gives 9/9 flies most consistent in time
   (median spread 0.24 vs 1.66).

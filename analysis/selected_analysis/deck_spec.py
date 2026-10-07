@@ -5,7 +5,7 @@ Wording is plain on purpose ("time spent in patch", "overall"). The text is writ
 against the numbers in summary.json (or filled from it), so re-read it after new data.
 
 Layout of the deck: a few summary slides across all datasets, then every analysis shown twice,
-once with the canonical 50/50 task and the split line side by side, once with the OO, GO and GG
+once with the 50/50 task and the split line side by side, once with the OO, GO and GG
 lines side by side (``image_grid`` slides).
 """
 from __future__ import annotations
@@ -15,12 +15,12 @@ import os
 from PIL import Image
 
 INK, TEAL, ORANGE, PURPLE = "12303A", "156F76", "D46638", "8A63B8"
-SHORT = {"past_50_50": "canonical", "past_50_50_nonatr": "no-ATR", "past_20_20": "20/20", "past_20_100": "20/100",
+SHORT = {"past_50_50": "50/50", "past_50_50_nonatr": "no-ATR", "past_20_20": "20/20", "past_20_100": "20/100",
          "split_line": "split line", "OO": "OO", "GO": "GO", "GG": "GG"}
 ATR_KEYS = ["past_50_50", "split_line", "OO", "GO", "GG", "past_20_20", "past_20_100"]
 BIG_KEYS = ["past_50_50", "split_line", "OO", "GO", "GG", "past_20_20", "past_20_100", "past_50_50_nonatr"]
 CROP = (0.708, 1.0)   # the "everyone together" panel at the bottom of the occupancy figure
-GROUPS = [("canonical 50/50 task and split line", ["past_50_50", "split_line"]),
+GROUPS = [("50/50 task and split line", ["past_50_50", "split_line"]),
           ("OO, GO and GG lines", ["OO", "GO", "GG"])]
 # title, figure file (after the "<key>__" prefix), crop, kind of caption
 ANALYSES = [
@@ -102,7 +102,7 @@ def slides(summ, figs):
     out.append({"type": "bar_h", "title": f"Ten datasets, {n_flies} flies",
                 "chart": {"title": "Flies per dataset", "cats": [clean(d) for d in summ["datasets"]],
                           "series": [("Flies", [d["flies"] for d in summ["datasets"]])], "colors": [TEAL]},
-                "side": [("Canonical and split line", True), ("The canonical 50/50 task and the split line, same task", False),
+                "side": [("50/50 task and split line", True), ("The earlier 50/50 task and the split line, same task", False),
                          ("1D lines", True), ("OO, GO and GG: the same task in three lines", False),
                          ("Other tasks", True), ("20/20, 20/100 and 60/100", False),
                          ("Reward-active", True), ("fed ATR, so the LED reward works. No-ATR flies are the control.", False)]})
@@ -116,8 +116,8 @@ def slides(summ, figs):
     out.append({"type": "image_stack", "title": "Reward-active flies linger at the patches",
                 "side": ["Reward-active flies peak at the patch entrances during training.", "Probing is close to flat.",
                          "No-ATR control flies show no peaks and spend less time inside the patches."],
-                "images": [(f("past_50_50__occupancy_training_probing.png"), "Canonical 50/50 task, reward-active (15 flies)", CROP),
-                           (f("past_50_50_nonatr__occupancy_training_probing.png"), "Canonical 50/50 task, no-ATR control (3 flies)", CROP)]})
+                "images": [(f("past_50_50__occupancy_training_probing.png"), "50/50 task, reward-active (15 flies)", CROP),
+                           (f("past_50_50_nonatr__occupancy_training_probing.png"), "50/50 task, no-ATR control (3 flies)", CROP)]})
 
     out.append({"type": "chart", "title": "Time in a patch differs several-fold between datasets", "kind": "col",
                 "chart": {"cats": [SHORT[k] for k in BIG_KEYS], "colors": [TEAL, ORANGE], "ylabel": "Median time in patch (s)",
@@ -131,13 +131,13 @@ def slides(summ, figs):
                           "series": [(n, [by[k]["leave_best"][key] for k in ATR_KEYS])
                                      for n, key in (("time in patch", "time"), ("fraction of start reward", "fraction"), ("reward value", "value"))]},
                 "image": f("past_20_100__leave_rule.png"),
-                "note": "20/100 task: patches differ by 0.24 in time against 1.66 in the other two. On 50/50 tasks time and fraction cannot be told apart."})
+                "note": "20/100: the two patches differ by 0.24 in time, 1.66 in the other two. On 50/50 tasks time and fraction are nearly the same thing, so which one wins for a fly depends on how long it stays, not on what it goes by."})
 
     if "past_50_50" in rw:
         v = rw["past_50_50"]
         out.append({"type": "image_text", "layout": "below", "title": "Reward-active flies against the no-ATR control",
                     "image": f("past_50_50__reward_vs_control.png"),
-                    "text": [f"Canonical 50/50 task only: it is the one dataset with a control of the same genotype. Reward-active flies "
+                    "text": [f"50/50 task only: it is the one dataset with a control of the same genotype. Reward-active flies "
                              f"spent about {v['gmean'][0]:.0f} s and {v['gmean'][1]:.0f} s in patches 1 and 2 ({v['n']} flies), the control "
                              f"{rw['control']['gmean'][0]:.0f} s and {rw['control']['gmean'][1]:.0f} s ({rw['control']['n']} flies); p = {v['p']:.3f}. "
                              "With so few control flies this is suggestive, not firm."]})
@@ -152,7 +152,7 @@ def slides(summ, figs):
                 "stats": [(f"{dt['n_negative']}/{dt['n']}", "flies shorten their time in patch in training", TEAL),
                           (f"{dp['n_negative']}/{dp['n']}", "flies shorten it in probing", ORANGE),
                           (f"{dt['median_rel']:.1f} vs {dp['median_rel']:.1f}", "median change, training vs probing", INK)],
-                "note": "Overall, over the canonical 50/50, split line, 20/20 and 20/100 datasets. The next slides show the figures dataset by dataset."})
+                "note": "Overall, over the 50/50, split line, 20/20 and 20/100 datasets. The next slides show the figures dataset by dataset."})
 
     for title, fname, crop, cap in ANALYSES:
         for gname, keys in GROUPS:

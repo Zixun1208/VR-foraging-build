@@ -23,16 +23,16 @@ from learning_fatigue import signed_ranks
 
 # key, run folder, label, group, ATR-fed
 DATASETS = [
-    ("past_50_50", "past/50_50", "canonical 50/50 task", "Canonical and split line", True),
-    ("split_line", "split_line/50_50", "split line, 50/50 task", "Canonical and split line", True),
+    ("past_50_50", "past/50_50", "50/50 task", "50/50 task and split line", True),
+    ("split_line", "split_line/50_50", "split line, 50/50 task", "50/50 task and split line", True),
     ("OO", "OO/50_50", "OO line (Orco x Orco)", "1D lines", True),
     ("GO", "GO/50_50", "GO line (Orco x Gr64)", "1D lines", True),
     ("GG", "GG/50_50", "GG line (Gr64 x Gr64)", "1D lines", True),
     ("past_20_20", "past/20_20", "20/20 task", "Other tasks", True),
     ("past_20_100", "past/20_100", "20/100 task", "Other tasks", True),
     ("past_60_100", "past/60_100", "60/100 task", "Other tasks", True),
-    ("past_50_50_nonatr", "past/50_50_non-atr", "canonical 50/50 task, no-ATR control", "Controls", False),
-    ("past_50_50_nonatr_b", "past_nonatr_b/50_50_non-atr", "canonical 50/50 task, no-ATR control (second folder)", "Controls", False),
+    ("past_50_50_nonatr", "past/50_50_non-atr", "50/50 task, no-ATR control", "Controls", False),
+    ("past_50_50_nonatr_b", "past_nonatr_b/50_50_non-atr", "50/50 task, no-ATR control (second folder)", "Controls", False),
 ]
 POOLS = {
     "earlier_atr": ["past_50_50", "past_20_20", "past_20_100", "split_line"],
