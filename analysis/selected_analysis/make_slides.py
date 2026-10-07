@@ -143,6 +143,8 @@ def render(prs, sp):
         text(s, 0.7, 3.3, 8.0, 0.9, sp["sub"], size=18, color=rgb("CADCDD"))
         return s
     title(s, sp["title"])
+    if sp.get("subtitle"):
+        text(s, 0.5, 0.88, 9, 0.3, sp["subtitle"], size=14, color=MUTED)
     if t == "bar_h":
         chart(s, "bar_h", sp["chart"], 0.5, 1.2, 5.9, 4.0)
         text(s, 6.8, 1.3, 2.7, 3.8, [(a, {"bold": b}) for a, b in sp["side"]])
@@ -181,6 +183,18 @@ def render(prs, sp):
             x = 0.5 + i * 3.1
             text(s, x, 4.0, 2.9, 0.7, big, size=36, color=rgb(col), bold=True)
             text(s, x, 4.7, 2.9, 0.7, label)
+    elif t == "image_grid":
+        for c in sp["cells"]:
+            text(s, c["lx"], c["ly"], c["lw"], 0.3, c["label"], size=12, color=TEAL, bold=True)
+            picture(s, c["path"], c["ix"], c["iy"], c["iw"], c["ih"], crop=c["crop"], alt=c["label"])
+        if sp.get("caption"):
+            text(s, 0.5, 4.85, 9.0, 0.6, sp["caption"], size=12)
+    elif t == "stats":
+        for i, (big, label, col) in enumerate(sp["stats"]):
+            x = 0.5 + i * 3.1
+            text(s, x, 1.9, 2.9, 1.0, big, size=32, color=rgb(col), bold=True)
+            text(s, x, 3.0, 2.9, 0.9, label)
+        text(s, 0.5, 4.5, 9.0, 0.8, sp["note"], size=13)
     elif t == "image_text" and sp.get("layout") == "below":
         picture(s, sp["image"], 0.5, 1.1, 9.0, 3.1, alt=sp["title"])
         text(s, 0.5, 4.3, 9.0, 1.2, [(x, {}) for x in sp["text"]], size=13)

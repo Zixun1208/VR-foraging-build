@@ -127,6 +127,8 @@ def render(sp):
                 "font-family:Cambria,Caladea,Georgia,serif;font-size:40pt;font-weight:bold;color:#fff;line-height:1.15")
                 + box(0.7, 3.3, 8.0, 0.9, html.escape(sp["sub"]), "font-size:18pt;color:#CADCDD") + "</div>")
     s = T(sp["title"])
+    if sp.get("subtitle"):
+        s += box(0.5, 0.88, 9, 0.3, html.escape(sp["subtitle"]), f"font-size:14pt;color:{MUTED}")
     if t == "bar_h":
         s += chart_img(0.5, 1.2, 5.9, 4.0, "bar_h", sp["chart"], sp["title"])
         side = "".join("<p style='font-weight:bold'>%s</p>" % html.escape(a) if b else "<p>%s</p>" % html.escape(a)
@@ -162,6 +164,18 @@ def render(sp):
             x = 0.5 + i * 3.1
             s += box(x, 4.0, 2.9, 0.7, html.escape(big), f"font-size:36pt;font-weight:bold;color:#{col}")
             s += box(x, 4.7, 2.9, 0.7, html.escape(label))
+    elif t == "image_grid":
+        for c in sp["cells"]:
+            s += box(c["lx"], c["ly"], c["lw"], 0.3, html.escape(c["label"]), f"font-size:12pt;font-weight:bold;color:{TEAL}")
+            s += picture(c["path"], c["ix"], c["iy"], c["iw"], c["ih"], crop=c["crop"], alt=c["label"])
+        if sp.get("caption"):
+            s += box(0.5, 4.85, 9.0, 0.6, html.escape(sp["caption"]), "font-size:12pt")
+    elif t == "stats":
+        for i, (big, label, col) in enumerate(sp["stats"]):
+            x = 0.5 + i * 3.1
+            s += box(x, 1.9, 2.9, 1.0, html.escape(big), f"font-size:32pt;font-weight:bold;color:#{col}")
+            s += box(x, 3.0, 2.9, 0.9, html.escape(label))
+        s += box(0.5, 4.5, 9.0, 0.8, html.escape(sp["note"]), "font-size:13pt")
     elif t == "image_text" and sp.get("layout") == "below":
         s += picture(sp["image"], 0.5, 1.1, 9.0, 3.1, alt=sp["title"])
         s += box(0.5, 4.3, 9.0, 1.2, "".join(f"<p>{html.escape(x)}</p>" for x in sp["text"]), "font-size:13pt")

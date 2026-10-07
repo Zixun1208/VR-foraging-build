@@ -3,17 +3,75 @@
 ``slides(summ, figs)`` returns a list of dicts; each has a ``type`` the two renderers know.
 Wording is plain on purpose ("time spent in patch", "overall"). The text is written by hand
 against the numbers in summary.json (or filled from it), so re-read it after new data.
+
+Layout of the deck: a few summary slides across all datasets, then every analysis shown twice,
+once with the canonical 50/50 task and the split line side by side, once with the OO, GO and GG
+lines side by side (``image_grid`` slides).
 """
 from __future__ import annotations
 
 import os
 
+from PIL import Image
+
 INK, TEAL, ORANGE, PURPLE = "12303A", "156F76", "D46638", "8A63B8"
-SHORT = {"past_50_50": "50/50", "past_50_50_nonatr": "no-ATR control", "past_20_20": "20/20", "past_20_100": "20/100",
+SHORT = {"past_50_50": "canonical 50/50", "past_50_50_nonatr": "no-ATR control", "past_20_20": "20/20", "past_20_100": "20/100",
          "split_line": "split line", "OO": "OO", "GO": "GO", "GG": "GG"}
-ATR_KEYS = ["past_50_50", "past_20_20", "past_20_100", "split_line", "OO", "GO", "GG"]
-BIG_KEYS = ["past_50_50", "past_50_50_nonatr"] + ATR_KEYS[1:]
+ATR_KEYS = ["past_50_50", "split_line", "OO", "GO", "GG", "past_20_20", "past_20_100"]
+BIG_KEYS = ["past_50_50", "split_line", "OO", "GO", "GG", "past_20_20", "past_20_100", "past_50_50_nonatr"]
 CROP = (0.708, 1.0)   # the "everyone together" panel at the bottom of the occupancy figure
+GROUPS = [("canonical 50/50 task and split line", ["past_50_50", "split_line"]),
+          ("OO, GO and GG lines", ["OO", "GO", "GG"])]
+# title, figure file (after the "<key>__" prefix), crop, kind of caption
+ANALYSES = [
+    ("Where flies spend their time", "occupancy_training_probing.png", CROP, None),
+    ("Walking speed along the corridor", "speed_by_position.png", None, None),
+    ("When flies leave each patch", "dissociation.png", None, None),
+    ("Which quantity matches across patches", "leave_rule.png", None, None),
+    ("Does a fly keep its place in the ranking?", "time_in_patch_repeatability.png", None, None),
+    ("Time in patch over the session", "time_in_patch_over_session.png", None, None),
+    ("Walking over the session", "locomotion_over_session.png", None, None),
+    ("Predicting a new fly", "model_comparison.png", None, "models"),
+]
+GRID_BOX = (0.5, 1.3, 9.0, 3.95)       # x, y, w, h of the figure area
+GAP, LABEL_H = 0.15, 0.3
+
+
+def fit_grid(items, box, caption=False):
+    """Place ``items`` [(path, label, crop)] in the best grid (<= 3 columns) for the biggest figures.
+
+    Returns cells with the label box (lx, ly, lw) and the picture box (ix, iy, iw, ih) in inches.
+    """
+    x0, y0, W, H = box
+    if caption:
+        H -= 0.6
+    sizes = []
+    for path, _, crop in items:
+        with Image.open(path) as im:
+            w, h = im.size
+        if crop:
+            h = int(h * crop[1]) - int(h * crop[0])
+        sizes.append((w, h))
+    n, best = len(items), None
+    for cols in range(1, min(n, 3) + 1):
+        rows = -(-n // cols)
+        cw = (W - GAP * (cols - 1)) / cols
+        ch = (H - GAP * (rows - 1)) / rows - LABEL_H
+        if ch <= 0:
+            continue
+        scale = min(min(cw / w, ch / h) for w, h in sizes)
+        if best is None or scale > best[0]:
+            best = (scale, cols, cw, ch)
+    _, cols, cw, ch = best
+    cells = []
+    for i, ((path, label, crop), (w, h)) in enumerate(zip(items, sizes)):
+        r, c = divmod(i, cols)
+        x = x0 + c * (cw + GAP)
+        y = y0 + r * (ch + LABEL_H + GAP)
+        k = min(cw / w, ch / h)
+        cells.append({"path": path, "label": label, "crop": crop, "lx": x, "ly": y, "lw": cw,
+                      "ix": x + (cw - w * k) / 2, "iy": y + LABEL_H, "iw": w * k, "ih": h * k})
+    return cells
 
 
 def slides(summ, figs):
@@ -44,9 +102,9 @@ def slides(summ, figs):
     out.append({"type": "bar_h", "title": f"Ten datasets, {n_flies} flies",
                 "chart": {"title": "Flies per dataset", "cats": [clean(d) for d in summ["datasets"]],
                           "series": [("Flies", [d["flies"] for d in summ["datasets"]])], "colors": [TEAL]},
-                "side": [("Earlier experiments", True), ("50/50, 20/20, 20/100 and 60/100 tasks, and no-ATR controls", False),
-                         ("Split line", True), ("12 flies, 50/50 task", False),
+                "side": [("Canonical and split line", True), ("The canonical 50/50 task and the split line, same task", False),
                          ("1D lines", True), ("OO, GO and GG: the same task in three lines", False),
+                         ("Other tasks", True), ("20/20, 20/100 and 60/100", False),
                          ("Reward-active", True), ("fed ATR, so the LED reward works. No-ATR flies are the control.", False)]})
 
     out.append({"type": "cards", "title": "What the data say",
@@ -58,14 +116,8 @@ def slides(summ, figs):
     out.append({"type": "image_stack", "title": "Time at the patches needs the reward to work",
                 "side": ["Reward-active flies peak at the patch entrances during training.", "Probing is close to flat.",
                          "No-ATR control flies show no peaks and spend less time inside the patches."],
-                "images": [(f("past_50_50__occupancy_training_probing.png"), "50/50 task, reward-active (15 flies)", CROP),
-                           (f("past_50_50_nonatr__occupancy_training_probing.png"), "50/50 task, no-ATR control (3 flies)", CROP)]})
-
-    out.append({"type": "image_stack", "title": "OO flies stop at the patch exits, GG at the entrances",
-                "side": ["OO peaks sit at corridor positions of about 40 and 122.", "GG and GO peak at about 20 and 100, GG strongest.",
-                         "Every other reward-active dataset also peaks at the entrances."],
-                "images": [(f("OO__occupancy_training_probing.png"), "OO line (Orco x Orco), 10 flies", CROP),
-                           (f("GG__occupancy_training_probing.png"), "GG line (Gr64 x Gr64), 6 flies", CROP)]})
+                "images": [(f("past_50_50__occupancy_training_probing.png"), "Canonical 50/50 task, reward-active (15 flies)", CROP),
+                           (f("past_50_50_nonatr__occupancy_training_probing.png"), "Canonical 50/50 task, no-ATR control (3 flies)", CROP)]})
 
     out.append({"type": "chart", "title": "Time in a patch differs several-fold between datasets", "kind": "col",
                 "chart": {"cats": [SHORT[k] for k in BIG_KEYS], "colors": [TEAL, ORANGE], "ylabel": "Median time in patch (s)",
@@ -85,7 +137,7 @@ def slides(summ, figs):
         v = rw["past_50_50"]
         out.append({"type": "image_text", "layout": "below", "title": "Reward-active flies against the no-ATR control",
                     "image": f("past_50_50__reward_vs_control.png"),
-                    "text": [f"Earlier 50/50 task only: it is the one dataset with a control of the same genotype. Reward-active flies "
+                    "text": [f"Canonical 50/50 task only: it is the one dataset with a control of the same genotype. Reward-active flies "
                              f"spent about {v['gmean'][0]:.0f} s and {v['gmean'][1]:.0f} s in patches 1 and 2 ({v['n']} flies), the control "
                              f"{rw['control']['gmean'][0]:.0f} s and {rw['control']['gmean'][1]:.0f} s ({rw['control']['n']} flies); p = {v['p']:.3f}. "
                              "With so few control flies this is suggestive, not firm."]})
@@ -96,18 +148,24 @@ def slides(summ, figs):
                 "stats": [(f"{sp['n'] - sp['n_negative']}/{sp['n']}", "flies speed up in training (overall, p < 0.001)", TEAL),
                           (f"{sq['n'] - sq['n_negative']}/{sq['n']}", "in probing, where no reward is given", ORANGE)]})
 
-    out.append({"type": "image_stats", "title": "Time in a patch shortens just as much without reward",
-                "image": f("split_line__time_in_patch_over_session.png"),
+    out.append({"type": "stats", "title": "Time in a patch shortens just as much without reward",
                 "stats": [(f"{dt['n_negative']}/{dt['n']}", "flies shorten their time in patch in training", TEAL),
                           (f"{dp['n_negative']}/{dp['n']}", "flies shorten it in probing", ORANGE),
-                          (f"{dt['median_rel']:.1f} vs {dp['median_rel']:.1f}", "typical change, training vs probing", INK)]})
+                          (f"{dt['median_rel']:.1f} vs {dp['median_rel']:.1f}", "typical change, training vs probing", INK)],
+                "note": "Overall, over the canonical 50/50, split line, 20/20 and 20/100 datasets. The next slides show the figures dataset by dataset."})
 
-    if ms:
-        out.append({"type": "image_text", "title": "Can a model predict a fly it has not seen?",
-                    "image": f("split_line__model_comparison.png") if os.path.isfile(f("split_line__model_comparison.png")) else f(f"{ms[0][0]}__model_comparison.png"),
-                    "text": [f"Split line shown. Of {len(ms)} datasets with 5 or more flies, switching strategies beat one shared rule in {wins}.",
-                             "Which model did best differs by dataset: " + "; ".join(f"{k} in {len(v)}" for k, v in best.items()) + ".",
-                             "No single model wins everywhere."]})
+    for title, fname, crop, cap in ANALYSES:
+        for gname, keys in GROUPS:
+            items = [(f(f"{k}__{fname}"), f"{by[k]['label']} ({by[k]['flies']} flies)", crop)
+                     for k in keys if os.path.isfile(f(f"{k}__{fname}"))]
+            if not items:
+                continue
+            caption = None
+            if cap == "models" and ms:
+                caption = (f"Of {len(ms)} datasets with 5 or more flies, switching strategies beat one shared rule in {wins}. "
+                           "Which model did best differs by dataset: " + "; ".join(f"{k} in {len(v)}" for k, v in best.items()) + ".")
+            out.append({"type": "image_grid", "title": title, "subtitle": gname[0].upper() + gname[1:],
+                        "cells": fit_grid(items, GRID_BOX, caption=bool(caption)), "caption": caption})
 
     out.append({"type": "columns", "title": "Tired, learning or restless?",
                 "cols": [("Tired", "Predicts slower, stiller flies.", "Not seen: speed and the fraction of time walking rise, pauses get shorter.", TEAL),
