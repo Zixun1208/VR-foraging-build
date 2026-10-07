@@ -38,6 +38,14 @@ be re-run alone, e.g. `--steps figures` after changing `figures.py`.
 Supporting: `selection.py` (finds sessions, reads kept-trial lists) and `trials.py` (trial and
 flash-log readers, task geometry parsed from the task folder name).
 
+Across datasets (run the pipeline on each first; outputs go to `runs/summary/`):
+
+- `stage_lines.py` stages a `<line>/sub-N/` dataset as `<date>/<task>/<sub>/` with symlinks
+- `report.py` one self-contained HTML comparing several runs
+- `summary_stats.py` -> `summary_md.py` -> `make_slides.py` writes `summary.json`,
+  `foraging_summary.md` (with `figs/`) and `foraging_summary.pptx`; the prose in the last two
+  is written by hand against the numbers, so re-read it after new data
+
 Other flags: `--dates D [D ...]`, `--min-leaves N` (visits per patch for a fly to enter
 `leave_rule`, default 3), `--out-root`, and `--dry-run` to list what would run and write
 nothing. Each module's own CLI still works standalone (`build_survival.py`, `leave_rule.py`,
