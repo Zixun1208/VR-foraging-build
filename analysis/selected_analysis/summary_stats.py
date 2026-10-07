@@ -106,14 +106,12 @@ def reward_results(runs, task_tag="50_50"):
     import reward_effect as rw
     by = {k: rel for k, rel, _, _, atr in DATASETS}
     ctrl = pd.concat([rw.per_fly(os.path.join(runs, by[k], "survival.csv")).rename(index=lambda i, k=k: f"{k}:{i}")
-                      for k in ("past_50_50_nonatr", "past_50_50_nonatr_b")])
+                      for k in rw.CONTROL_KEYS])
     res = {"control": {"n": int(len(ctrl)), "gmean": [rw.gmean_ci(ctrl[p])[0] for p in (0, 1)]}}
-    for k, rel, label, grp, atr in DATASETS:
-        if atr and rel.endswith(task_tag):
-            tab = rw.per_fly(os.path.join(runs, rel, "survival.csv"))
-            a = np.exp(np.log(tab[[0, 1]]).mean(axis=1))
-            c = np.exp(np.log(ctrl[[0, 1]]).mean(axis=1))
-            res[k] = {"n": int(len(tab)), "gmean": [rw.gmean_ci(tab[p])[0] for p in (0, 1)], "p": rw.perm_p(a, c)}
+    tab = rw.per_fly(os.path.join(runs, by[rw.ACTIVE_KEY], "survival.csv"))
+    a = np.exp(np.log(tab[[0, 1]]).mean(axis=1))
+    c = np.exp(np.log(ctrl[[0, 1]]).mean(axis=1))
+    res[rw.ACTIVE_KEY] = {"n": int(len(tab)), "gmean": [rw.gmean_ci(tab[p])[0] for p in (0, 1)], "p": rw.perm_p(a, c)}
     return res
 
 

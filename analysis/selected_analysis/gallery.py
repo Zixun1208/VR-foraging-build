@@ -59,7 +59,7 @@ FIGS = [
     ("figures/time_in_patch_repeatability.png", "Does a fly keep its place in the ranking?",
      "Typical time in patch in the first half of the session against the second half. The dashed line means no change, so points below it are shorter later."),
     ("figures/reward_vs_control.png", "Reward-active flies against the no-ATR control",
-     "Time spent in each patch. Bars are the average over flies with a 95% range, dots are single flies, the p value compares the two groups."),
+     "Only for the earlier 50/50 task, the one dataset with a control of the same genotype. Bars are the average over flies with a 95% range, dots are single flies, the p value compares the two groups."),
     ("figures/model_comparison.png", "Predicting a new fly",
      "How well four models predict a fly they have not seen (bits per visit, higher is better). Stars compare neighbouring bars (corrected p). Right: how often the switching model changes strategy. Needs at least 5 flies."),
     ("learning_fatigue/time_in_patch_over_session.png", "Time spent in patch over the session",
@@ -107,11 +107,11 @@ def build(runs, summ, out):
     ds = summ["datasets"]
     parts = ["<h1>Every figure for every dataset</h1>",
              f"<p>{len(ds)} datasets, {sum(d['flies'] for d in ds)} flies. Each section shows the same figures as the poster and a few more, "
-             "one dataset at a time. Figures that need something a dataset lacks (a control group, 5 or more flies, ball-tracking data) "
+             "one dataset at a time. Figures that need something a dataset lacks (a control of the same genotype, 5 or more flies, ball-tracking data) "
              "are left out and listed on the section's first page.</p>",
              "<h2>Words used</h2><dl>" + "".join(f"<dt>{html.escape(a)}</dt><dd>{html.escape(b)}</dd>" for a, b in GLOSSARY) + "</dl>",
              "<h2>Contents</h2><ol>" + "".join(f"<li><a href='#s{i}'>{html.escape(d['label'])}</a> ({d['flies']} flies)</li>"
-                                               for i, d in enumerate(ds)) + "<li><a href='#all'>All reward-active datasets against the control</a></li></ol>"]
+                                               for i, d in enumerate(ds)) + "</ol>"]
     for i, d in enumerate(ds):
         base = os.path.join(runs, d["path"])
         present = [(rel, t, c) for rel, t, c in FIGS if os.path.isfile(os.path.join(base, rel))]
@@ -128,11 +128,6 @@ def build(runs, summ, out):
             small = rel.endswith(("leave_geometry.png", "leave_rule.png", "leave_rule_boxes.png", "baseline_vs_training.png"))
             parts.append(f"<div class='fig{' small' if small else ''}'><div class='t'><h3>{html.escape(d['label'])}: {html.escape(t)}</h3>"
                          f"<p class='cap'>{html.escape(c)}</p></div><img src='{data_uri(os.path.join(base, rel))}'></div>")
-    allp = os.path.join(out, "reward_vs_control_all.png")
-    if os.path.isfile(allp):
-        parts.append("<div class='sec' id='all'><h1>All reward-active datasets against the control</h1>"
-                     "<p>The 50/50 task is the only one with a no-ATR control (5 flies from two folders).</p></div>"
-                     f"<div class='fig'><img src='{data_uri(allp)}'></div>")
     return f"<!doctype html><html><head><meta charset='utf-8'><title>Every figure for every dataset</title><style>{CSS}</style></head><body>{''.join(parts)}</body></html>"
 
 

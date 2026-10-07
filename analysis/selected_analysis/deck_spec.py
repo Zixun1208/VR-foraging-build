@@ -81,12 +81,14 @@ def slides(summ, figs):
                 "image": f("past_20_100__leave_rule.png"),
                 "note": "20/100 task: patches differ by 0.24 in time against 1.66 in the other two. On 50/50 tasks time and fraction cannot be told apart."})
 
-    if "control" in rw:
-        parts = "; ".join(f"{SHORT.get(k, k)} p = {v['p']:.3f}" for k, v in rw.items() if k != "control")
+    if "past_50_50" in rw:
+        v = rw["past_50_50"]
         out.append({"type": "image_text", "layout": "below", "title": "Reward-active flies against the no-ATR control",
-                    "image": f("reward_vs_control_all.png"),
-                    "text": [f"Only the 50/50 task has a control ({rw['control']['n']} flies, about {rw['control']['gmean'][0]:.0f} s and {rw['control']['gmean'][1]:.0f} s in patches 1 and 2). "
-                             f"Group differences: {parts}. The OO line does not differ from the control."]})
+                    "image": f("past_50_50__reward_vs_control.png"),
+                    "text": [f"Earlier 50/50 task only: it is the one dataset with a control of the same genotype. Reward-active flies "
+                             f"spent about {v['gmean'][0]:.0f} s and {v['gmean'][1]:.0f} s in patches 1 and 2 ({v['n']} flies), the control "
+                             f"{rw['control']['gmean'][0]:.0f} s and {rw['control']['gmean'][1]:.0f} s ({rw['control']['n']} flies); p = {v['p']:.3f}. "
+                             "With so few control flies this is suggestive, not firm."]})
 
     out.append({"type": "chart_stats", "title": "Walking speeds up in most flies in every dataset", "kind": "col",
                 "chart": {"cats": [SHORT[k] for k in ATR_KEYS], "colors": [TEAL, ORANGE], "ylabel": "% of flies whose speed rises", "ymax": 115,

@@ -92,18 +92,13 @@ def pfmt(p):
 def extra_takeaways(summ):
     out = []
     rw = summ.get("reward", {})
-    parts = []
-    for k, v in rw.items():
-        if k == "control":
-            continue
-        name = next(d["label"] for d in summ["datasets"] if d["key"] == k)
-        parts.append(f"{name}: {v['p']:.3f}")
-    if parts:
-        out.append("**Reward-active flies spend more time in the patches than the no-ATR control, "
-                   "except the OO line.** Average time in patch, training: control "
-                   f"{rw['control']['gmean'][0]:.0f} s / {rw['control']['gmean'][1]:.0f} s (patch 1 / patch 2, "
-                   f"{rw['control']['n']} flies). Group difference p values: " + "; ".join(parts) +
-                   ". Only the 50/50 task has a control.")
+    if "past_50_50" in rw:
+        v = rw["past_50_50"]
+        out.append("**Reward-active flies against the no-ATR control.** Only the earlier 50/50 task has a control of the "
+                   "same genotype, so only that comparison is made. Average time in patch in training (patch 1 / patch 2): "
+                   f"reward-active {v['gmean'][0]:.0f} s / {v['gmean'][1]:.0f} s ({v['n']} flies), control "
+                   f"{rw['control']['gmean'][0]:.0f} s / {rw['control']['gmean'][1]:.0f} s ({rw['control']['n']} flies); "
+                   f"group difference p = {v['p']:.3f}. The control group is small, so this is suggestive, not firm.")
     ms = [(d["label"], d["models"]) for d in summ["datasets"] if "models" in d]
     if ms:
         wins = [lab for lab, m in ms if m["p_holm"]["switching - shared"] < 0.05]
@@ -196,10 +191,6 @@ def main():
            "paired test across flies.", "", t3, "", "## Predicting a new fly", "",
            "Bits per visit by which each model predicts a fly it has not seen better than a single average "
            "(higher is better). Only datasets with 5 or more flies.", "", t4, ""]
-    if os.path.isfile(os.path.join(a.out, "reward_vs_control_all.png")):
-        copy_fig(os.path.join(a.out, "reward_vs_control_all.png"), os.path.join(a.out, "figs", "reward_vs_control_all.png"))
-        md += ["## Reward-active flies against the no-ATR control", "",
-               "![All 50/50 datasets against the no-ATR control](figs/reward_vs_control_all.png)", ""]
     for d in summ["datasets"]:
         md += [f"## {d['label']}", "", f"{d['flies']} flies, {d['episodes']} patch visits.", ""]
         for rel, title, cap in FIGS:

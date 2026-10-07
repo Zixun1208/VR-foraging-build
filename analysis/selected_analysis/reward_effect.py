@@ -2,15 +2,14 @@
 """The poster's reward-vs-control figure: time spent in each patch, reward-active flies
 against flies fed no ATR (the optogenetic reward cannot switch on).
 
-Only the 50/50 task has a no-ATR control. For every reward-active 50/50 dataset one figure
-(``figures/reward_vs_control.png``, two bars per patch), and one figure with all of them
-side by side. Bars are the geometric mean over flies of each fly's median time in the patch
+Only the earlier 50/50 task has a no-ATR control of the same genotype, so that is the one
+comparison made (``figures/reward_vs_control.png``, two bars per patch). Bars are the geometric mean over flies of each fly's median time in the patch
 (training, completed visits), with a bootstrap 95% interval; points are single flies. The p
 value is a permutation test on the group label, using each fly's average log time over the
 two patches.
 
 Run (after pipeline.py has made survival.csv for every dataset):
-    python reward_effect.py --runs runs --out-all runs/summary/reward_vs_control_all.png
+    python reward_effect.py --runs runs
 """
 from __future__ import annotations
 
@@ -30,6 +29,10 @@ from summary_stats import DATASETS
 
 GREEN, PURPLE = "#3f9f6f", "#8a63b8"
 MIN_LEFT = 3        # completed visits per patch for a fly to count
+# Only this pair is like for like: the earlier 50/50 task and the no-ATR flies run with it. The
+# split-line and 1D-line datasets are other genotypes (or unrecorded), so they are not compared.
+ACTIVE_KEY = "past_50_50"
+CONTROL_KEYS = ["past_50_50_nonatr", "past_50_50_nonatr_b"]
 
 
 def per_fly(survival_csv):
@@ -100,25 +103,15 @@ def draw(groups, out, title):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", default="runs")
-    ap.add_argument("--task-tag", default="50_50")
-    ap.add_argument("--out-all", default="runs/summary/reward_vs_control_all.png")
     a = ap.parse_args()
-    by = {k: (rel, label, atr) for k, rel, label, grp, atr in DATASETS}
-    ctrl_keys = ["past_50_50_nonatr", "past_50_50_nonatr_b"]
+    by = {k: (rel, label) for k, rel, label, grp, atr in DATASETS}
     ctrl = pd.concat([per_fly(os.path.join(a.runs, by[k][0], "survival.csv")).rename(index=lambda i, k=k: f"{k}:{i}")
-                      for k in ctrl_keys])
-    active = {k: per_fly(os.path.join(a.runs, rel, "survival.csv")) for k, (rel, label, atr) in by.items()
-              if atr and rel.endswith(a.task_tag)}
-    print(f"control flies: {len(ctrl)}; reward-active datasets: {list(active)}")
-    groups_all = [("no-ATR\ncontrol", PURPLE, ctrl)]
-    for k, tab in active.items():
-        label = re.sub(r" \(.*?\)", "", by[k][1]).replace(", 50/50 task", "").replace(" task", "")
-        draw([("no-ATR\ncontrol", PURPLE, ctrl), ("reward\nactive", GREEN, tab)], os.path.join(a.runs, by[k][0], "figures", "reward_vs_control.png"),
-             f"Reward-active flies against the no-ATR control: {label}")
-        groups_all.append((label, GREEN, tab))
-    os.makedirs(os.path.dirname(os.path.abspath(a.out_all)), exist_ok=True)
-    draw(groups_all, a.out_all, "Time spent in the patches: no-ATR control and every reward-active 50/50 dataset")
-    print("wrote", a.out_all)
+                      for k in CONTROL_KEYS])
+    tab = per_fly(os.path.join(a.runs, by[ACTIVE_KEY][0], "survival.csv"))
+    out = os.path.join(a.runs, by[ACTIVE_KEY][0], "figures", "reward_vs_control.png")
+    draw([("no-ATR\ncontrol", PURPLE, ctrl), ("reward\nactive", GREEN, tab)], out,
+         "Reward-active flies against the no-ATR control (50/50 task)")
+    print(f"control flies: {len(ctrl)}, reward-active flies: {len(tab)} -> {out}")
 
 
 if __name__ == "__main__":
