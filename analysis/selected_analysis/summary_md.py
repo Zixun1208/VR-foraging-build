@@ -61,6 +61,11 @@ TAKEAWAYS = [
     "should not be compared between datasets without care.",
 ]
 
+EDGE_NOTE_PROFILE = ("Share of trial time at each distance from the entrance (onset) and exit (offset) of each patch, "
+                     "training above and probing below. Positive distance is into the patch at an entrance and past the patch at an exit; "
+                     "the shaded band is 5 units either side of the edge.")
+EDGE_NOTE = ("The jump comes at the edge itself, then time keeps adding up more slowly. Reward-active flies add roughly 5 to 12% of trial time within 5 units after an entrance, and the split line builds up more slowly. The OO line adds time after the exits instead (about 7 to 8% by 5 units). Probing is flat and noisy, and the no-ATR control shows no entrance jump. Baseline for each edge is the mean share 15 to 9 units before it, so a flat line means no extra time.")
+
 CAVEATS = [
     "Small numbers: 1 to 15 flies per dataset, and the exact test cannot go below p = 0.002 with "
     "10 flies. The 60/100 task has one fly and the second no-ATR folder has two.",
@@ -196,6 +201,11 @@ def main():
            "paired test across flies.", "", t3, "", "## Predicting a new fly", "",
            "Bits per visit by which each model predicts a fly it has not seen better than a single average "
            "(higher is better). Only datasets with 5 or more flies.", "", t4, ""]
+    for name, title in (("edge_profiles_by_patch.png", "Time around the four patch edges"),
+                        ("edge_accumulation.png", "Extra time added up around the four patch edges")):
+        if os.path.isfile(os.path.join(a.out, name)):
+            copy_fig(os.path.join(a.out, name), os.path.join(a.out, "figs", name))
+            md += [f"## {title}", "", EDGE_NOTE if "accumulation" in name else EDGE_NOTE_PROFILE, "", f"![{title}](figs/{name})", ""]
     for d in summ["datasets"]:
         md += [f"## {d['label']}", "", f"{d['flies']} flies, {d['episodes']} patch visits.", ""]
         for rel, title, cap in FIGS:

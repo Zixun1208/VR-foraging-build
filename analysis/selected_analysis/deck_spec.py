@@ -167,6 +167,14 @@ def slides(summ, figs):
             out.append({"type": "image_grid", "title": title, "subtitle": gname[0].upper() + gname[1:],
                         "cells": fit_grid(items, GRID_BOX, caption=bool(caption)), "caption": caption})
 
+    if os.path.isfile(f("edge_profiles_by_patch.png")):
+        out.append({"type": "image_text", "layout": "below", "title": "Time around the four patch edges",
+                    "image": f("edge_profiles_by_patch.png"),
+                    "text": ["Patch 1 and patch 2, entrance (onset) and exit (offset), for training and probing. "
+                             "The entrance spike is bigger at patch 2 than at patch 1, and only the OO line (and a little GO) has an exit peak."]})
+        out.append({"type": "image_text", "layout": "below", "title": "Extra time adds up within about 5 units of the edge",
+                    "image": f("edge_accumulation.png"), "text": ["The jump comes at the edge itself, then time keeps adding up more slowly. Reward-active flies add roughly 5 to 12% of trial time within 5 units after an entrance, and the split line builds up more slowly. The OO line adds time after the exits instead (about 7 to 8% by 5 units). Probing is flat and noisy, and the no-ATR control shows no entrance jump."]})
+
     out.append({"type": "columns", "title": "Tired, learning or restless?",
                 "cols": [("Tired", "Predicts slower, stiller flies.", "Not seen: speed and the fraction of time walking rise, pauses get shorter.", TEAL),
                          ("Learning", "Predicts a fall that only happens when reward is on.", "Not seen: probing falls at least as much as training.", TEAL),

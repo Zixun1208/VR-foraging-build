@@ -111,7 +111,7 @@ def build(runs, summ, out):
              "are left out and listed on the section's first page.</p>",
              "<h2>Words used</h2><dl>" + "".join(f"<dt>{html.escape(a)}</dt><dd>{html.escape(b)}</dd>" for a, b in GLOSSARY) + "</dl>",
              "<h2>Contents</h2><ol>" + "".join(f"<li><a href='#s{i}'>{html.escape(d['label'])}</a> ({d['flies']} flies)</li>"
-                                               for i, d in enumerate(ds)) + "</ol>"]
+                                               for i, d in enumerate(ds)) + "<li><a href='#edges'>Around the patch edges (all datasets)</a></li></ol>"]
     for i, d in enumerate(ds):
         base = os.path.join(runs, d["path"])
         present = [(rel, t, c) for rel, t, c in FIGS if os.path.isfile(os.path.join(base, rel))]
@@ -128,6 +128,17 @@ def build(runs, summ, out):
             small = rel.endswith(("leave_geometry.png", "leave_rule.png", "leave_rule_boxes.png", "baseline_vs_training.png"))
             parts.append(f"<div class='fig{' small' if small else ''}'><div class='t'><h3>{html.escape(d['label'])}: {html.escape(t)}</h3>"
                          f"<p class='cap'>{html.escape(c)}</p></div><img src='{data_uri(os.path.join(base, rel))}'></div>")
+    edge = [("edge_profiles_by_patch.png", "Time around the four patch edges",
+             "Share of trial time at each distance from the entrance (onset) and exit (offset) of patch 1 and patch 2, training above and probing below."),
+            ("edge_accumulation.png", "Extra time added up around the four patch edges",
+             "The same, added up from 15 units before each edge, over the edge's own baseline (the mean 15 to 9 units before it). A jump means extra time at that spot.")]
+    shown = [(n, t, c) for n, t, c in edge if os.path.isfile(os.path.join(out, n))]
+    if shown:
+        parts.append("<div class='sec' id='edges'><h1>Around the patch edges</h1><p>All datasets together, for the four edges. "
+                     "Shaded band: 5 units either side of the edge.</p></div>")
+        for n, t, c in shown:
+            parts.append(f"<div class='fig'><div class='t'><h3>{html.escape(t)}</h3><p class='cap'>{html.escape(c)}</p></div>"
+                         f"<img src='{data_uri(os.path.join(out, n))}'></div>")
     return f"<!doctype html><html><head><meta charset='utf-8'><title>Every figure for every dataset</title><style>{CSS}</style></head><body>{''.join(parts)}</body></html>"
 
 
