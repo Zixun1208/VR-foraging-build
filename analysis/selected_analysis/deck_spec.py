@@ -176,6 +176,10 @@ def slides(summ, figs):
                     "image": f("edge_cumulative.png"), "text": ["Running total of trial time from 15 units before each edge (no baseline, so it only rises). "
                              "Most reward-active lines go from about 8 to 10% just before an entrance to 17 to 23% at +5 units; the no-ATR control rises only 1 to 2 points. "
                              "The OO line climbs less at entrances (3 to 4 points) but about 10 points after the exits, against about 4 for the 50/50 line. Probing is flat and noisy."]})
+        out.append({"type": "image_text", "layout": "below", "title": "The same, as extra time over each edge's own baseline",
+                    "image": f("edge_accumulation.png"), "text": ["Each edge's baseline is the mean share 15 to 9 units before it, and the curve adds up what is above or below it. "
+                             "It dips where flies move faster than their baseline, such as after patch 2 exits, so it is not a total of time. "
+                             "Reward-active flies add roughly 5 to 12% within 5 units after an entrance, and the no-ATR control shows no entrance jump."]})
 
     if os.path.isfile(f("corridor_cumulative.png")):
         out.append({"type": "image_text", "layout": "below", "title": "Time added up along the whole corridor",
