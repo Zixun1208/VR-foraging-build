@@ -68,7 +68,7 @@ def draw(pf, measure, out):
     datasets = [d for d in DATASET_ORDER if d in set(pf.dataset)]
     ncol = 4
     nrow = -(-len(datasets) // ncol)
-    fig, axes = plt.subplots(nrow, ncol, figsize=(16, 3.6 * nrow + 1.0), sharey=True, squeeze=False)
+    fig, axes = plt.subplots(nrow, ncol, figsize=(16, 3.2 * nrow + 1.0), sharey=True, squeeze=False)
     tests = pair_tests(pf, col)
     rng = np.random.default_rng(0)
     top, bottom = 0.0, 0.0

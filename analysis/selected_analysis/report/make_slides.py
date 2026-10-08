@@ -195,6 +195,9 @@ def render(prs, sp):
             text(s, x, 1.9, 2.9, 1.0, big, size=32, color=rgb(col), bold=True)
             text(s, x, 3.0, 2.9, 0.9, label)
         text(s, 0.5, 4.5, 9.0, 0.8, sp["note"], size=13)
+    elif t == "image_text" and sp.get("layout") == "wide":
+        picture(s, sp["image"], 0.5, 1.0, 9.0, 3.75, alt=sp["title"])
+        text(s, 0.5, 4.8, 9.0, 0.75, [(x, {}) for x in sp["text"]], size=12)
     elif t == "image_text" and sp.get("layout") == "below":
         picture(s, sp["image"], 0.5, 1.1, 9.0, 3.1, alt=sp["title"])
         text(s, 0.5, 4.3, 9.0, 1.2, [(x, {}) for x in sp["text"]], size=13)

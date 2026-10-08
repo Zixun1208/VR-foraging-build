@@ -176,6 +176,9 @@ def render(sp):
             s += box(x, 1.9, 2.9, 1.0, html.escape(big), f"font-size:32pt;font-weight:bold;color:#{col}")
             s += box(x, 3.0, 2.9, 0.9, html.escape(label))
         s += box(0.5, 4.5, 9.0, 0.8, html.escape(sp["note"]), "font-size:13pt")
+    elif t == "image_text" and sp.get("layout") == "wide":
+        s += picture(sp["image"], 0.5, 1.0, 9.0, 3.75, alt=sp["title"])
+        s += box(0.5, 4.8, 9.0, 0.75, "".join(f"<p>{html.escape(x)}</p>" for x in sp["text"]), "font-size:12pt")
     elif t == "image_text" and sp.get("layout") == "below":
         s += picture(sp["image"], 0.5, 1.1, 9.0, 3.1, alt=sp["title"])
         s += box(0.5, 4.3, 9.0, 1.2, "".join(f"<p>{html.escape(x)}</p>" for x in sp["text"]), "font-size:13pt")

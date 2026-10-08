@@ -175,6 +175,12 @@ def slides(summ, figs):
         out.append({"type": "image_text", "layout": "below", "title": "Extra time adds up within about 5 units of the edge",
                     "image": f("edge_accumulation.png"), "text": ["The jump comes at the edge itself, then time keeps adding up more slowly. Reward-active flies add roughly 5 to 12% of trial time within 5 units after an entrance, and the split line builds up more slowly. The OO line adds time after the exits instead (about 7 to 8% by 5 units). Probing is flat and noisy, and the no-ATR control shows no entrance jump."]})
 
+    if os.path.isfile(f("edge_window_plain.png")):
+        out.append({"type": "image_text", "layout": "wide", "title": "Patch 1 against patch 2 around the edges",
+                    "image": f("edge_window_plain.png"), "text": ["Occupancy over -5 to +5 units around each edge (an even pace gives about 8%). Stars: patch 1 and 2 differ. In training the patch 2 entrance is higher in 20/100, GG and the split line, lower in OO, equal in 50/50. Probing is near an even pace."]})
+        out.append({"type": "image_text", "layout": "wide", "title": "The same, with each fly's own baseline taken off",
+                    "image": f("edge_window_baseline.png"), "text": ["The same minus each fly's own baseline. Clearest is the 20/100 entrance: patch 2 adds 4.4 points more, 9 of 9 flies. With about 28 tests a single star is weak, and patch rewards differ in 50/50 and 20/100."]})
+
     out.append({"type": "columns", "title": "Tired, learning or restless?",
                 "cols": [("Tired", "Predicts slower, stiller flies.", "Not seen: speed and the fraction of time walking rise, pauses get shorter.", TEAL),
                          ("Learning", "Predicts a fall that only happens when reward is on.", "Not seen: probing falls at least as much as training.", TEAL),

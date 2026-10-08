@@ -132,7 +132,11 @@ def build(runs, summ, out):
     edge = [("edge_profiles_by_patch.png", "Time around the four patch edges",
              "Share of trial time at each distance from the entrance (onset) and exit (offset) of patch 1 and patch 2, training above and probing below."),
             ("edge_accumulation.png", "Extra time added up around the four patch edges",
-             "The same, added up from 15 units before each edge, over the edge's own baseline (the mean 15 to 9 units before it). A jump means extra time at that spot.")]
+             "The same, added up from 15 units before each edge, over the edge's own baseline (the mean 15 to 9 units before it). A jump means extra time at that spot."),
+            ("edge_window_plain.png", "Patch 1 against patch 2 around the edges",
+             "Occupancy added up over -5 to +5 units around each edge, one number per fly (mean, s.e.m., single flies). Stars mark a patch 1 vs patch 2 pair that differs."),
+            ("edge_window_baseline.png", "Patch 1 against patch 2 around the edges, own baseline taken off",
+             "The same minus each fly's own usual share over those 11 units (mean 15 to 9 units before the edge).")]
     shown = [(n, t, c) for n, t, c in edge if os.path.isfile(os.path.join(out, n))]
     if shown:
         parts.append("<div class='sec' id='edges'><h1>Around the patch edges</h1><p>All datasets together, for the four edges. "
