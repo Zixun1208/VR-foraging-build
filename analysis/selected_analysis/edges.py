@@ -27,6 +27,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MultipleLocator
 
 import selection
 import trials
@@ -85,6 +86,18 @@ def summarize(df):
     return out
 
 
+def same_y(axes, pad=0.04):
+    """One y range and one tick step on every panel, so panels can be compared by eye."""
+    lo = min(l.get_ydata().min() for ax in axes.flat for l in ax.get_lines() if len(l.get_xdata()) > 2)
+    hi = max(l.get_ydata().max() for ax in axes.flat for l in ax.get_lines() if len(l.get_xdata()) > 2)
+    step = next(st for st in (1, 2, 5, 10, 20) if (hi - lo) / st <= 8)
+    lo0 = 0 if lo >= 0 else np.floor((lo - pad * (hi - lo)) / step) * step
+    lo, hi = lo0, np.ceil((hi + pad * (hi - lo)) / step) * step
+    for ax in axes.flat:
+        ax.set_ylim(lo, hi)
+        ax.yaxis.set_major_locator(MultipleLocator(step))
+
+
 def draw_profiles(sm, out):
     fig, axes = plt.subplots(2, 4, figsize=(15, 6.4), sharex="col")
     for r, phase in enumerate(("training", "probing")):
@@ -108,6 +121,7 @@ def draw_profiles(sm, out):
                 ax.spines[sp].set_visible(False)
     axes[0, 0].legend(frameon=False, fontsize=8, loc="upper right")
     fig.suptitle("Time spent around the four patch edges (average over flies; shaded = +/-5 units)", fontsize=13, weight="bold")
+    same_y(axes)
     fig.tight_layout()
     fig.savefig(out, dpi=170, facecolor="white")
     plt.close(fig)
@@ -154,6 +168,7 @@ def draw_accumulation(sm, out, plain=False):
     axes[0, 0].legend(frameon=False, fontsize=8, loc="upper left")
     fig.suptitle("Time added up from 15 units before each patch edge" if plain else
                  "Extra time added up around the four patch edges (over each edge's baseline 15 to 9 units before it)", fontsize=13, weight="bold")
+    same_y(axes)
     fig.tight_layout()
     fig.savefig(out, dpi=170, facecolor="white")
     plt.close(fig)
