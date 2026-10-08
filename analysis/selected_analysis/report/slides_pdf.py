@@ -19,6 +19,7 @@ import json
 import os
 import shutil
 import subprocess
+import time
 
 import matplotlib
 matplotlib.use("Agg")
@@ -214,8 +215,11 @@ def main():
     out = os.path.join(a.dir, "foraging_summary.pdf")
     with open(src, "w") as f:
         f.write(doc)
+    t0 = time.time()
     subprocess.run([a.chromium, "--headless", "--disable-gpu", "--no-sandbox", f"--print-to-pdf={out}",
                     "--no-pdf-header-footer", src], check=True, capture_output=True)
+    if not os.path.isfile(out) or os.path.getmtime(out) < t0:
+        raise SystemExit(f"chromium did not write {out}: it cannot write into hidden folders (e.g. under .claude); use an output folder whose path has no dot-folder")
     print("wrote", out)
 
 

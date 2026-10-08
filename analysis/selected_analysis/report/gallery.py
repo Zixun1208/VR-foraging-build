@@ -18,6 +18,7 @@ import json
 import os
 import shutil
 import subprocess
+import time
 
 from .. import config
 from PIL import Image
@@ -160,8 +161,11 @@ def main():
     pdf = os.path.join(a.out, "all_figures.pdf")
     with open(src, "w") as f:
         f.write(build(a.runs, summ, a.out))
+    t0 = time.time()
     subprocess.run([a.chromium, "--headless", "--disable-gpu", "--no-sandbox", f"--print-to-pdf={pdf}",
                     "--no-pdf-header-footer", src], check=True, capture_output=True)
+    if not os.path.isfile(pdf) or os.path.getmtime(pdf) < t0:
+        raise SystemExit(f"chromium did not write {pdf}: it cannot write into hidden folders (e.g. under .claude); use an output folder whose path has no dot-folder")
     print("wrote", pdf, f"({os.path.getsize(pdf) / 1e6:.1f} MB)")
 
 
