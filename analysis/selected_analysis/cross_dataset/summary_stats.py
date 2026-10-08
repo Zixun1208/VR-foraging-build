@@ -7,7 +7,7 @@ slopes (relative to each fly's median) over groups of datasets, with an exact/ra
 signed-rank sign-flip test. Used by summary_md.py and the slide builder.
 
 Run:
-    python summary_stats.py --runs runs --out runs/summary/summary.json
+    python -m selected_analysis.cross_dataset.summary_stats --runs runs --out runs/summary/summary.json
 """
 from __future__ import annotations
 
@@ -18,8 +18,8 @@ import os
 import numpy as np
 import pandas as pd
 
-from figures import signflip_p
-from learning_fatigue import signed_ranks
+from .. import config
+from ..core.stats import signed_ranks, signflip_p
 
 # key, run folder, label, group, ATR-fed
 DATASETS = [
@@ -103,7 +103,7 @@ def pooled(runs, keys, atr_sets):
 
 def reward_results(runs, task_tag="50_50"):
     """Reward-active 50/50 datasets against the no-ATR control (see reward_effect.py)."""
-    import reward_effect as rw
+    from . import reward_effect as rw
     by = {k: rel for k, rel, _, _, atr in DATASETS}
     ctrl = pd.concat([rw.per_fly(os.path.join(runs, by[k], "survival.csv")).rename(index=lambda i, k=k: f"{k}:{i}")
                       for k in rw.CONTROL_KEYS])
@@ -117,8 +117,8 @@ def reward_results(runs, task_tag="50_50"):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--runs", default="runs")
-    ap.add_argument("--out", default="runs/summary/summary.json")
+    ap.add_argument("--runs", default=config.RUNS)
+    ap.add_argument("--out", default=config.SUMMARY_JSON)
     a = ap.parse_args()
     sets = [one(a.runs, *d) for d in DATASETS]
     out = {"datasets": sets,

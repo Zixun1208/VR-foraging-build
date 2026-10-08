@@ -6,8 +6,8 @@ is written by hand against those numbers, so re-read it after re-running on new 
 Wording is plain on purpose: "time spent in patch", "overall", no jargon.
 
 Run:
-    python summary_stats.py --runs runs --out runs/summary/summary.json
-    python summary_md.py --runs runs --summary runs/summary/summary.json --out runs/summary
+    python -m selected_analysis.cross_dataset.summary_stats --runs runs --out runs/summary/summary.json
+    python -m selected_analysis.report.summary_md --runs runs --summary runs/summary/summary.json --out runs/summary
 """
 from __future__ import annotations
 
@@ -15,9 +15,10 @@ import argparse
 import json
 import os
 
+from .. import config
 from PIL import Image
 
-from gallery import FIGS, GLOSSARY
+from .gallery import FIGS, GLOSSARY
 
 MAX_W = 1300
 NAMES = {"shared": "one shared rule", "switching": "switching strategies",
@@ -177,9 +178,9 @@ def copy_fig(src, dst):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--runs", default="runs")
-    ap.add_argument("--summary", default="runs/summary/summary.json")
-    ap.add_argument("--out", default="runs/summary")
+    ap.add_argument("--runs", default=config.RUNS)
+    ap.add_argument("--summary", default=config.SUMMARY_JSON)
+    ap.add_argument("--out", default=config.SUMMARY)
     a = ap.parse_args()
     with open(a.summary) as f:
         summ = json.load(f)

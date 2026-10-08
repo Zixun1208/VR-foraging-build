@@ -10,7 +10,7 @@ Needs one task with ATR flies. Not made here, because they need other tasks or m
 20_100 geometry/dissociation, per-fly timer (20_100), reward effect (non-ATR), GLM comparison.
 
 Run:
-    python figures.py --raw-root ~/Raw_data_by_task/"split line" --task <task folder> \
+    python -m selected_analysis.per_dataset.figures --raw-root ~/Raw_data_by_task/"split line" --task <task folder> \
         --survival data/survival_split_line.csv --out results/split_line
 """
 from __future__ import annotations
@@ -26,14 +26,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 
-import selection
-import trials
-
-TEAL, ORANGE, BLUE, FOREST, GOLD = "#156f76", "#d46638", "#337ab7", "#3f7f5f", "#c4932f"
-INK, GRID, SHADE = "#1b2a2f", "#dfe6e4", "#f3ded5"
-FLOOR = 0.1
-PHASES = ("training", "probing")
-COLORS = {"training": TEAL, "probing": ORANGE}
+from ..core import selection
+from ..core import trials
+from ..core.plotstyle import (BLUE, COLORS, FLOOR, FOREST, GOLD, GRID, INK, ORANGE, PHASES, SHADE, TEAL, style)
+from ..core.stats import fmt_p, signflip_p, stars
 
 
 class Ctx:
@@ -63,40 +59,9 @@ class Ctx:
         print("  wrote", name)
 
 
-def style(ax, size=13):
-    for sp in ("top", "right"):
-        ax.spines[sp].set_visible(False)
-    for sp in ("left", "bottom"):
-        ax.spines[sp].set_color("#8fa09d")
-    ax.tick_params(labelsize=size, colors=INK)
-    ax.grid(True, axis="y", color=GRID, linewidth=1.0)
-    ax.set_axisbelow(True)
-
-
 def shade(ax, ctx):
     for lo, hi in ctx.bands:
         ax.axvspan(lo, hi, color=SHADE, alpha=0.58, zorder=0)
-
-
-# ---- statistics --------------------------------------------------------------------------
-def signflip_p(d, max_exact=16, n_rand=20000, seed=0):
-    """Two-sided paired sign-flip test on within-fly differences."""
-    d = np.asarray(d, float)
-    d = d[np.isfinite(d)]
-    obs = abs(d.sum())
-    if len(d) <= max_exact:
-        signs = np.array(list(itertools.product((-1, 1), repeat=len(d))))
-    else:
-        signs = np.random.default_rng(seed).choice((-1, 1), size=(n_rand, len(d)))
-    return float(np.mean(np.abs(signs @ d) >= obs - 1e-12))
-
-
-def fmt_p(p):
-    return "<0.001" if p < 0.001 else f"={p:.3f}"
-
-
-def stars(p):
-    return "***" if p < 0.001 else "**" if p < 0.01 else "*" if p < 0.05 else "ns"
 
 
 # ---- per-trial readers --------------------------------------------------------------------

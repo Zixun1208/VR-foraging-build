@@ -3,7 +3,7 @@
 Plan for a follow-up to `selected_analysis`: does patch dwell change over a session, and if so
 is it fatigue or learning?
 
-Status: **built** as `selected_analysis/learning_fatigue.py`, the `learning_fatigue` pipeline
+Status: **built** as `selected_analysis/per_dataset/learning_fatigue.py`, the `learning_fatigue` pipeline
 step (`python pipeline.py ... --steps learning_fatigue`). Outputs land in
 `runs/<name>/<task tag>/learning_fatigue/`: `trials.csv`, `slopes.csv`, `summary.csv`,
 `baseline_reference.csv` and figures.
@@ -55,7 +55,7 @@ not been tested.
    for whether walking speed alone explains the drop.
 4. **Per-fly slope.** Fit dwell against trial order over all 60 trials instead of splitting at
    the median, one slope per fly, then a paired exact sign-flip test across flies (the same test
-   `selected_analysis/figures.py` uses). Do it per patch and per phase.
+   `selected_analysis/per_dataset/figures.py` uses). Do it per patch and per phase.
 
 ## Outputs planned
 

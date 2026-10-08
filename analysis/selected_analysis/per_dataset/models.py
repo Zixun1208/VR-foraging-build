@@ -18,7 +18,7 @@ poster comparisons). The GLM-HMM and drifting code is vendored from
 perceptual-decision-making/scripts (glmhmm.py, drift.py).
 
 Needs at least MIN_FLIES flies. Run:
-    python models.py --raw-root ~/Raw_data --task <task folder> --selection applied --out <dir>
+    python -m selected_analysis.per_dataset.models --raw-root ~/Raw_data --task <task folder> --selection applied --out <dir>
 """
 from __future__ import annotations
 
@@ -33,11 +33,12 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from scipy.linalg import cho_factor, cho_solve
 
-import drift
-import selection
-import trials
-from figures import BLUE, INK, ORANGE, TEAL, signflip_p, stars, style
-from glmhmm import GaussianGLMHMM
+from ..vendored import drift
+from ..core import selection
+from ..core import trials
+from ..core.plotstyle import BLUE, INK, ORANGE, TEAL, style
+from ..core.stats import signflip_p, stars
+from ..vendored.glmhmm import GaussianGLMHMM
 
 PURPLE = "#8a63b8"
 LN2 = np.log(2.0)

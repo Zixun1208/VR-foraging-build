@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Slides (.pptx) from ``runs/summary``; the content is in deck_spec.py.
 
-    python make_slides.py --dir runs/summary        -> runs/summary/foraging_summary.pptx
+    python -m selected_analysis.report.make_slides --dir runs/summary        -> runs/summary/foraging_summary.pptx
 
 Native charts (python-pptx), 16:9 at 10 x 5.625 in. Run summary_stats.py and summary_md.py first
 (summary_md.py copies the figures the slides use into ``<dir>/figs``).
@@ -22,8 +22,8 @@ from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Inches, Pt
 
-import deck_spec
-
+from .. import config
+from . import deck_spec
 rgb = lambda h: RGBColor.from_string(h)
 INK, TEAL, ORANGE = rgb(deck_spec.INK), rgb(deck_spec.TEAL), rgb(deck_spec.ORANGE)
 MUTED, GRID, CARD, WHITE = rgb("52666B"), rgb("DFE6E4"), rgb("F3F7F6"), rgb("FFFFFF")
@@ -227,7 +227,7 @@ def render(prs, sp):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dir", default="runs/summary")
+    ap.add_argument("--dir", default=config.SUMMARY)
     a = ap.parse_args()
     with open(os.path.join(a.dir, "summary.json")) as f:
         summ = json.load(f)

@@ -9,7 +9,7 @@ value is a permutation test on the group label, using each fly's average log tim
 two patches.
 
 Run (after pipeline.py has made survival.csv for every dataset):
-    python reward_effect.py --runs runs
+    python -m selected_analysis.cross_dataset.reward_effect --runs runs
 """
 from __future__ import annotations
 
@@ -24,8 +24,10 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from figures import INK, TEAL, stars, style
-from summary_stats import DATASETS
+from .. import config
+from ..core.plotstyle import INK, TEAL, style
+from ..core.stats import stars
+from .summary_stats import DATASETS
 
 GREEN, PURPLE = "#3f9f6f", "#8a63b8"
 MIN_LEFT = 3        # completed visits per patch for a fly to count
@@ -102,7 +104,7 @@ def draw(groups, out, title):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--runs", default="runs")
+    ap.add_argument("--runs", default=config.RUNS)
     a = ap.parse_args()
     by = {k: (rel, label) for k, rel, label, grp, atr in DATASETS}
     ctrl = pd.concat([per_fly(os.path.join(a.runs, by[k][0], "survival.csv")).rename(index=lambda i, k=k: f"{k}:{i}")

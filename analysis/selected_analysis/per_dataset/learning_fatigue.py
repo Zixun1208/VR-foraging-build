@@ -17,7 +17,7 @@ falling too, points to fatigue; a fall only in training, or with faster inter-pa
 traversal, points to learning about the reward. Output only suggests -- it does not decide.
 
 Run:
-    python learning_fatigue.py --raw-root ~/Raw_data_by_task/"split line" \
+    python -m selected_analysis.per_dataset.learning_fatigue --raw-root ~/Raw_data_by_task/"split line" \
         --task <task folder> --survival runs/split_line/50_50/survival.csv --out <dir>
 """
 from __future__ import annotations
@@ -31,10 +31,11 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-import figures
-import selection
-import trials
-from figures import COLORS, INK, PHASES, signflip_p, stars, style
+from . import figures
+from ..core import selection
+from ..core import trials
+from ..core.plotstyle import COLORS, INK, PHASES, style
+from ..core.stats import signed_ranks, signflip_p, stars
 
 GRID_DT = 0.25          # s, resampling grid for speed
 MOVE_SPEED = 0.5        # corridor units/s; below this the fly counts as stalled
@@ -128,12 +129,6 @@ def slope_table(tt):
             rows.append({"fly_id": fly, "phase": ph, "metric": metric, "patch": patch,
                          "slope": b, "rel_slope": b / med if med else np.nan, "n_trials": n})
     return pd.DataFrame(rows)
-
-
-def signed_ranks(d):
-    """sign(d) * rank(|d|): sign-flip on these is the exact signed-rank test, outlier-robust."""
-    d = np.asarray(d, float)
-    return np.sign(d) * pd.Series(np.abs(d)).rank().to_numpy()
 
 
 def summarize(sl):

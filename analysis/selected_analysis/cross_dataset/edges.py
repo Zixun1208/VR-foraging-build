@@ -12,8 +12,8 @@ The baseline of an edge is the mean share 15 to 9 units before it. Offsets run f
 (+ means into the patch at an onset and past the patch at an offset); +10 and beyond would pass
 the corridor end at the last edge. Trials that are unreadable or outside 5-900 s are left out.
 
-Run (the stage folder holds the 1D lines, see stage_lines.py):
-    python edges.py --stage <stage dir> --out runs/summary
+Run (the stage folder holds the 1D lines, see tools/stage_lines.py):
+    python -m selected_analysis.cross_dataset.edges --stage <stage dir> --out runs/summary
 """
 from __future__ import annotations
 
@@ -25,12 +25,13 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MultipleLocator
 
-import selection
-import trials
-
-T50 = "foraging_non-iti_130_20-40_100-120_1.0v-0.1v_2.5v-0.1v_50_50"
-T20_100 = "foraging_non-iti_130_20-40_100-120_2.5v-0.1v_2.5v-0.1v_20_100"
+from .. import config
+from ..core import selection
+from ..core import trials
+T50 = config.T50
+T20_100 = config.T20_100
 OFFSETS = np.arange(-15, 10)
 BASE = (-15, -9)                       # offsets that define each edge's baseline
 EDGES = [("patch 1", "onset", 20.0), ("patch 1", "offset", 40.0), ("patch 2", "onset", 100.0), ("patch 2", "offset", 120.0)]
@@ -78,6 +79,18 @@ def summarize(df):
     return out
 
 
+def same_y(axes, pad=0.04):
+    """One y range and one tick step on every panel, so panels can be compared by eye."""
+    lo = min(l.get_ydata().min() for ax in axes.flat for l in ax.get_lines() if len(l.get_xdata()) > 2)
+    hi = max(l.get_ydata().max() for ax in axes.flat for l in ax.get_lines() if len(l.get_xdata()) > 2)
+    step = next(st for st in (1, 2, 5, 10, 20) if (hi - lo) / st <= 8)
+    lo0 = 0 if lo >= 0 else np.floor((lo - pad * (hi - lo)) / step) * step
+    lo, hi = lo0, np.ceil((hi + pad * (hi - lo)) / step) * step
+    for ax in axes.flat:
+        ax.set_ylim(lo, hi)
+        ax.yaxis.set_major_locator(MultipleLocator(step))
+
+
 def draw_profiles(sm, out):
     fig, axes = plt.subplots(2, 4, figsize=(15, 6.4), sharex="col")
     for r, phase in enumerate(("training", "probing")):
@@ -101,6 +114,7 @@ def draw_profiles(sm, out):
                 ax.spines[sp].set_visible(False)
     axes[0, 0].legend(frameon=False, fontsize=8, loc="upper right")
     fig.suptitle("Time spent around the four patch edges (average over flies; shaded = +/-5 units)", fontsize=13, weight="bold")
+    same_y(axes)
     fig.tight_layout()
     fig.savefig(out, dpi=170, facecolor="white")
     plt.close(fig)
@@ -141,6 +155,7 @@ def draw_accumulation(sm, out):
                 ax.spines[sp].set_visible(False)
     axes[0, 0].legend(frameon=False, fontsize=8, loc="upper left")
     fig.suptitle("Extra time added up around the four patch edges (over each edge's baseline 15 to 9 units before it)", fontsize=13, weight="bold")
+    same_y(axes)
     fig.tight_layout()
     fig.savefig(out, dpi=170, facecolor="white")
     plt.close(fig)
@@ -149,10 +164,10 @@ def draw_accumulation(sm, out):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--raw", default=os.path.expanduser("~/Raw_data"))
-    ap.add_argument("--split", default=os.path.expanduser("~/Raw_data_by_task/split line"))
-    ap.add_argument("--stage", required=True, help="folder with OO/, GO/, GG/ staged by stage_lines.py")
-    ap.add_argument("--out", default="runs/summary")
+    ap.add_argument("--raw", default=config.RAW_ROOT)
+    ap.add_argument("--split", default=config.SPLIT_LINE_ROOT)
+    ap.add_argument("--stage", default=config.STAGE, help="folder with OO/, GO/, GG/ staged by tools/stage_lines.py")
+    ap.add_argument("--out", default=config.SUMMARY)
     ap.add_argument("--redo", action="store_true", help="recompute even if edge_profiles_by_fly.csv exists")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)

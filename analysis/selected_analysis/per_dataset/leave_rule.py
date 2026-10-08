@@ -23,7 +23,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-HERE = os.path.dirname(os.path.abspath(__file__))
 VARS = {"elapsed_sec": "time", "value_frac": "fraction", "value_volts": "value"}
 COLORS = {"time": "#156f76", "fraction": "#d46638", "value": "#8a63b8"}
 
@@ -128,7 +127,7 @@ def main():
     ap.add_argument("csv")
     ap.add_argument("--min-leaves", type=int, default=3,
                     help="min completed visits per patch for a fly to count (default 3)")
-    ap.add_argument("--out", default=os.path.join(HERE, "results"))
+    ap.add_argument("--out", default=os.path.join(config.RUNS, "leave_rule"))
     a = ap.parse_args()
 
     res = run(a.csv, a.out, a.min_leaves)

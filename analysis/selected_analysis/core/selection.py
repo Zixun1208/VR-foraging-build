@@ -15,7 +15,9 @@ import json
 import os
 from dataclasses import dataclass
 
-RAW_ROOT = os.path.expanduser("~/Raw_data")
+from .. import config
+
+RAW_ROOT = config.RAW_ROOT
 
 
 @dataclass(frozen=True)

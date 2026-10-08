@@ -10,8 +10,8 @@ training/*.csv, so a recommendation actually changes what is analysed. Kept tria
 Columns match the earlier analysis's data/survival*.csv, so existing scripts read it.
 
 Run:
-    python build_survival.py --raw-root ~/Raw_data --task <task folder name>
-    python build_survival.py --task <task> --selection applied --dates 2026-09-11
+    python -m selected_analysis.per_dataset.build_survival --raw-root ~/Raw_data --task <task folder name>
+    python -m selected_analysis.per_dataset.build_survival --task <task> --selection applied --dates 2026-09-11
 """
 from __future__ import annotations
 
@@ -21,10 +21,9 @@ import os
 
 import numpy as np
 
-import selection
-import trials
-
-HERE = os.path.dirname(os.path.abspath(__file__))
+from .. import config
+from ..core import selection
+from ..core import trials
 MIN_EPISODE_SEC = 1.0
 BIN_SEC = 1.0
 FIELDS = ["fly_id", "date", "sub", "config", "phase", "patch", "start_volt", "visit_id",
@@ -104,7 +103,7 @@ def main():
     if not rows:
         raise SystemExit(f"no selected episodes for {a.task} under {a.raw_root} "
                          f"({a.selection} selections)")
-    out = a.out or os.path.join(HERE, "data", f"survival_{trials.task_tag(a.task)}.csv")
+    out = a.out or os.path.join(config.RUNS, "survival", f"survival_{trials.task_tag(a.task)}.csv")
     write_csv(rows, out)
     print(f"wrote {len(rows)} bins, {len({r['visit_id'] for r in rows})} episodes, "
           f"{len({r['fly_id'] for r in rows})} flies -> {out}")

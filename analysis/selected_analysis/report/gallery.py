@@ -6,7 +6,7 @@ across-dataset reward figure, and prints the pages with headless Chromium (a sna
 write into hidden folders, so --out must be a normal directory).
 
 Run (after pipeline.py, reward_effect.py and summary_stats.py):
-    python gallery.py --runs runs --summary runs/summary/summary.json --out runs/summary
+    python -m selected_analysis.report.gallery --runs runs --summary runs/summary/summary.json --out runs/summary
 """
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ import os
 import shutil
 import subprocess
 
+from .. import config
 from PIL import Image
 
 MAX_W = 1800
@@ -144,9 +145,9 @@ def build(runs, summ, out):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--runs", default="runs")
-    ap.add_argument("--summary", default="runs/summary/summary.json")
-    ap.add_argument("--out", default="runs/summary")
+    ap.add_argument("--runs", default=config.RUNS)
+    ap.add_argument("--summary", default=config.SUMMARY_JSON)
+    ap.add_argument("--out", default=config.SUMMARY)
     ap.add_argument("--chromium", default=shutil.which("chromium-browser") or shutil.which("chromium"))
     a = ap.parse_args()
     with open(a.summary) as f:

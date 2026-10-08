@@ -4,7 +4,7 @@
 The same slides as make_slides.py (content in deck_spec.py), laid out as HTML pages
 (10 x 5.625 in) with matplotlib charts, then printed to PDF with headless Chromium.
 
-    python slides_pdf.py --dir runs/summary        -> runs/summary/foraging_summary.pdf
+    python -m selected_analysis.report.slides_pdf --dir runs/summary        -> runs/summary/foraging_summary.pdf
 
 Chromium (a snap) cannot write into hidden directories such as ~/.claude, so --dir must be a
 normal folder.
@@ -26,8 +26,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 
-import deck_spec
-
+from .. import config
+from . import deck_spec
 INK, TEAL, ORANGE, MUTED, GRID, CARD = "#12303A", "#156F76", "#D46638", "#52666B", "#DFE6E4", "#F3F7F6"
 CSS = """
 @page { size: 10in 5.625in; margin: 0 }
@@ -199,7 +199,7 @@ def render(sp):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dir", default="runs/summary")
+    ap.add_argument("--dir", default=config.SUMMARY)
     ap.add_argument("--chromium", default=shutil.which("chromium-browser") or shutil.which("chromium"))
     a = ap.parse_args()
     with open(os.path.join(a.dir, "summary.json")) as f:

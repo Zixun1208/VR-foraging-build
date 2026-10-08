@@ -21,9 +21,9 @@ can re-run one alone):
                                     (needs 5+ flies; the poster's model comparison)
 
 Run:
-    python pipeline.py --raw-root ~/Raw_data_by_task/"split line" --name split_line
-    python pipeline.py --raw-root ~/Raw_data --name all --task <task folder> --steps figures
-    python pipeline.py --raw-root ... --name x --dry-run
+    python -m selected_analysis.per_dataset.pipeline --raw-root ~/Raw_data_by_task/"split line" --name split_line
+    python -m selected_analysis.per_dataset.pipeline --raw-root ~/Raw_data --name all --task <task folder> --steps figures
+    python -m selected_analysis.per_dataset.pipeline --raw-root ... --name x --dry-run
 """
 from __future__ import annotations
 
@@ -31,15 +31,14 @@ import argparse
 import os
 import sys
 
-import build_survival
-import figures
-import leave_rule
-import learning_fatigue
-import models
-import selection
-import trials
-
-HERE = os.path.dirname(os.path.abspath(__file__))
+from .. import config
+from . import build_survival
+from . import figures
+from . import leave_rule
+from . import learning_fatigue
+from . import models
+from ..core import selection
+from ..core import trials
 STEPS = ("survival", "leave_rule", "figures", "learning_fatigue", "models")
 
 
@@ -103,7 +102,7 @@ def main():
                     help=f"comma list from {STEPS} (default: all)")
     ap.add_argument("--min-leaves", type=int, default=3,
                     help="completed visits per patch for a fly to enter leave_rule")
-    ap.add_argument("--out-root", default=os.path.join(HERE, "runs"))
+    ap.add_argument("--out-root", default=config.RUNS)
     ap.add_argument("--dry-run", action="store_true", help="list what would run, write nothing")
     a = ap.parse_args()
 
