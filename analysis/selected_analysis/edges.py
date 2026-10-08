@@ -7,6 +7,7 @@ position, measured from each edge (patch 1 onset 20, offset 40; patch 2 onset 10
 
     edge_profiles_by_patch.png   time at each distance from the four edges, training / probing
     edge_accumulation.png        extra time (over each edge's own baseline) added up with distance
+    corridor_cumulative.png      share of trial time spent before each corridor position (from the start)
 
 The baseline of an edge is the mean share 15 to 9 units before it. Offsets run from -15 to +9
 (+ means into the patch at an onset and past the patch at an offset); +10 and beyond would pass
@@ -32,6 +33,7 @@ import trials
 T50 = "foraging_non-iti_130_20-40_100-120_1.0v-0.1v_2.5v-0.1v_50_50"
 T20_100 = "foraging_non-iti_130_20-40_100-120_2.5v-0.1v_2.5v-0.1v_20_100"
 OFFSETS = np.arange(-15, 10)
+CORRIDOR = 130                         # corridor length; positions are binned in 1-unit steps from 0
 BASE = (-15, -9)                       # offsets that define each edge's baseline
 EDGES = [("patch 1", "onset", 20.0), ("patch 1", "offset", 40.0), ("patch 2", "onset", 100.0), ("patch 2", "offset", 120.0)]
 COLORS = {"50/50 (Gr64f)": "#156F76", "20/100 (Gr64f)": "#337AB7", "split line": "#3f7f5f", "OO": "#D46638",
@@ -46,11 +48,12 @@ def sources(raw, split, stage):
 
 
 def fly_profiles(label, root, kind, task):
-    """Long table of per-fly time shares for one dataset."""
-    rows = []
+    """Per-fly time shares for one dataset: (around the four edges, along the whole corridor)."""
+    rows, crow = [], []
     for s in selection.iter_selected(root, kind, task):
         for phase in ("training", "probing"):
             hist = {(p, e): np.zeros(len(OFFSETS)) for p, e, _ in EDGES}
+            chist = np.zeros(CORRIDOR)
             total = 0.0
             for fn in s.kept[phase]:
                 path = os.path.join(s.sub_dir, phase, fn)
@@ -59,6 +62,7 @@ def fly_profiles(label, root, kind, task):
                 t, X = trials.load_trajectory(path)
                 dt = trials.sample_dt(t)
                 total += dt.sum()
+                chist += np.histogram(np.clip(X, 0, CORRIDOR - 1e-6), bins=np.arange(CORRIDOR + 1), weights=dt)[0]
                 for patch, edge, c in EDGES:
                     bins = np.arange(OFFSETS[0] - 0.5, OFFSETS[-1] + 1.5) + c
                     hist[(patch, edge)] += np.histogram(X, bins=bins, weights=dt)[0]
@@ -68,7 +72,9 @@ def fly_profiles(label, root, kind, task):
                 for o, v in zip(OFFSETS, h / total * 100):
                     rows.append({"dataset": label, "fly_id": s.fly_id, "phase": phase, "patch": patch,
                                  "edge": edge, "offset": int(o), "share": float(v)})
-    return pd.DataFrame(rows)
+            for pos, v in enumerate(chist / total * 100):
+                crow.append({"dataset": label, "fly_id": s.fly_id, "phase": phase, "position": pos, "share": float(v)})
+    return pd.DataFrame(rows), pd.DataFrame(crow)
 
 
 def summarize(df):
@@ -147,6 +153,40 @@ def draw_accumulation(sm, out):
     return acc
 
 
+def draw_cumulative(cdf, out):
+    """Real accumulation: share of trial time spent before each corridor position, mean over flies."""
+    cdf = cdf.sort_values("position").copy()
+    cdf["cum"] = cdf.groupby(["dataset", "fly_id", "phase"]).share.cumsum()
+    sm = cdf.groupby(["dataset", "phase", "position"]).cum.agg(["mean", "sem"]).reset_index()
+    fig, axes = plt.subplots(1, 2, figsize=(13, 4.8), sharey=True)
+    for ax, phase in zip(axes, ("training", "probing")):
+        for lo, hi in ((20, 40), (100, 120)):
+            ax.axvspan(lo, hi, color="#f3ded5", alpha=0.45, zorder=0)
+        for _, _, pos in EDGES:
+            ax.axvline(pos, color="#12303A", lw=0.9)
+        ax.plot([0, CORRIDOR], [0, 100], color="#999999", lw=1.0, ls=":", label="even pace (same time per unit)")
+        for name in COLORS:
+            d = sm[(sm.dataset == name) & (sm.phase == phase)]
+            if d.empty:
+                continue
+            x = d.position + 1                       # bin k covers positions k to k+1; cumulative is at its right edge
+            ax.plot(np.r_[0, x], np.r_[0, d["mean"]], color=COLORS[name], lw=2.0 if "no-ATR" not in name else 1.5,
+                    ls="-" if "no-ATR" not in name else "--", label=name)
+        ax.set_title(phase.capitalize(), fontsize=12, weight="bold")
+        ax.set_xlabel("Corridor position (shaded = patches)", fontsize=10)
+        ax.set_xlim(0, CORRIDOR)
+        ax.set_ylim(0, 100)
+        for sp in ("top", "right"):
+            ax.spines[sp].set_visible(False)
+    axes[0].set_ylabel("Share of trial time spent before this position (%)", fontsize=10)
+    axes[0].legend(frameon=False, fontsize=8, loc="upper left")
+    fig.suptitle("Time added up along the corridor (average over flies)", fontsize=13, weight="bold")
+    fig.tight_layout()
+    fig.savefig(out, dpi=170, facecolor="white")
+    plt.close(fig)
+    return sm
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--raw", default=os.path.expanduser("~/Raw_data"))
@@ -157,15 +197,20 @@ def main():
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     csv = os.path.join(a.out, "edge_profiles_by_fly.csv")
-    if os.path.isfile(csv) and not a.redo:
-        df = pd.read_csv(csv)
+    ccsv = os.path.join(a.out, "corridor_profile_by_fly.csv")
+    if os.path.isfile(csv) and os.path.isfile(ccsv) and not a.redo:
+        df, cdf = pd.read_csv(csv), pd.read_csv(ccsv)
     else:
-        df = pd.concat([fly_profiles(*s) for s in sources(a.raw, a.split, a.stage)], ignore_index=True)
+        parts = [fly_profiles(*s) for s in sources(a.raw, a.split, a.stage)]
+        df = pd.concat([p[0] for p in parts], ignore_index=True)
+        cdf = pd.concat([p[1] for p in parts], ignore_index=True)
         df.to_csv(csv, index=False)
+        cdf.to_csv(ccsv, index=False)
     sm = summarize(df)
     draw_profiles(sm, os.path.join(a.out, "edge_profiles_by_patch.png"))
     acc = draw_accumulation(sm, os.path.join(a.out, "edge_accumulation.png"))
-    print("wrote", csv)
+    draw_cumulative(cdf, os.path.join(a.out, "corridor_cumulative.png"))
+    print("wrote", csv, ccsv)
     # extra time accumulated by +5 and by the end of the window, training
     t = acc[(acc.phase == "training") & (acc.offset.isin([5, 9]))].pivot_table(
         index=["dataset", "patch", "edge"], columns="offset", values="extra").round(1)

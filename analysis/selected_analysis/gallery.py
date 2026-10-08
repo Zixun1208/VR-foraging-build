@@ -131,7 +131,9 @@ def build(runs, summ, out):
     edge = [("edge_profiles_by_patch.png", "Time around the four patch edges",
              "Share of trial time at each distance from the entrance (onset) and exit (offset) of patch 1 and patch 2, training above and probing below."),
             ("edge_accumulation.png", "Extra time added up around the four patch edges",
-             "The same, added up from 15 units before each edge, over the edge's own baseline (the mean 15 to 9 units before it). A jump means extra time at that spot.")]
+             "The same, added up from 15 units before each edge, over the edge's own baseline (the mean 15 to 9 units before it). A jump means extra time at that spot."),
+            ("corridor_cumulative.png", "Time added up along the corridor",
+             "The real running total: the share of trial time spent before each corridor position, from the start of the corridor (mean over flies). A steeper stretch means more time there; the dotted line is an even pace. Shaded bands are the patches.")]
     shown = [(n, t, c) for n, t, c in edge if os.path.isfile(os.path.join(out, n))]
     if shown:
         parts.append("<div class='sec' id='edges'><h1>Around the patch edges</h1><p>All datasets together, for the four edges. "
