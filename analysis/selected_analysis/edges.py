@@ -7,6 +7,7 @@ position, measured from each edge (patch 1 onset 20, offset 40; patch 2 onset 10
 
     edge_profiles_by_patch.png   time at each distance from the four edges, training / probing
     edge_accumulation.png        extra time (over each edge's own baseline) added up with distance
+    edge_cumulative.png          time added up from 15 units before each edge, no baseline (only rises)
     corridor_cumulative.png      share of trial time spent before each corridor position (from the start)
 
 The baseline of an edge is the mean share 15 to 9 units before it. Offsets run from -15 to +9
@@ -122,8 +123,12 @@ def accumulation(sm):
     return pd.concat(rows)
 
 
-def draw_accumulation(sm, out):
+def draw_accumulation(sm, out, plain=False):
+    """plain=True: running sum of the share itself (no baseline), so every curve only rises."""
     acc = accumulation(sm)
+    if plain:
+        acc = sm.sort_values("offset").copy()
+        acc["extra"] = acc.groupby(["dataset", "phase", "patch", "edge"])["mean"].cumsum()
     fig, axes = plt.subplots(2, 4, figsize=(15, 6.4), sharex="col")
     for r, phase in enumerate(("training", "probing")):
         for c, (patch, edge, pos) in enumerate(EDGES):
@@ -134,7 +139,8 @@ def draw_accumulation(sm, out):
                     continue
                 ax.plot(d.offset, d.extra, color=COLORS[name], lw=2.0 if "no-ATR" not in name else 1.5,
                         ls="-" if "no-ATR" not in name else "--", label=name)
-            ax.axhline(0, color="#999999", lw=0.8)
+            if not plain:
+                ax.axhline(0, color="#999999", lw=0.8)
             ax.axvline(0, color="#12303A", lw=1.1)
             ax.axvspan(-5, 5, color="#f3ded5", alpha=0.45, zorder=0)
             if r == 0:
@@ -142,11 +148,12 @@ def draw_accumulation(sm, out):
             if r == 1:
                 ax.set_xlabel("Distance from the edge (corridor units)", fontsize=10)
             if c == 0:
-                ax.set_ylabel(f"{phase.capitalize()}\nextra time added up (% of trial time)", fontsize=10)
+                ax.set_ylabel(f"{phase.capitalize()}\n{'time added up' if plain else 'extra time added up'} (% of trial time)", fontsize=10)
             for sp in ("top", "right"):
                 ax.spines[sp].set_visible(False)
     axes[0, 0].legend(frameon=False, fontsize=8, loc="upper left")
-    fig.suptitle("Extra time added up around the four patch edges (over each edge's baseline 15 to 9 units before it)", fontsize=13, weight="bold")
+    fig.suptitle("Time added up from 15 units before each patch edge" if plain else
+                 "Extra time added up around the four patch edges (over each edge's baseline 15 to 9 units before it)", fontsize=13, weight="bold")
     fig.tight_layout()
     fig.savefig(out, dpi=170, facecolor="white")
     plt.close(fig)
@@ -209,6 +216,11 @@ def main():
     sm = summarize(df)
     draw_profiles(sm, os.path.join(a.out, "edge_profiles_by_patch.png"))
     acc = draw_accumulation(sm, os.path.join(a.out, "edge_accumulation.png"))
+    plain = draw_accumulation(sm, os.path.join(a.out, "edge_cumulative.png"), plain=True)
+    t = plain[(plain.phase == "training") & (plain.offset.isin([-1, 5, 9]))].pivot_table(
+        index=["dataset", "patch", "edge"], columns="offset", values="extra").round(1)
+    print("time (% of trial) added up from -15 to -1, +5, +9, training:")
+    print(t.to_string())
     draw_cumulative(cdf, os.path.join(a.out, "corridor_cumulative.png"))
     print("wrote", csv, ccsv)
     # extra time accumulated by +5 and by the end of the window, training
