@@ -30,7 +30,7 @@ selected_analysis/
   core/              selection.py (find sessions, kept trials), trials.py (readers, task geometry),
                      stats.py (sign-flip, signed ranks), plotstyle.py (colours, axis style)
   per_dataset/       pipeline.py runs: build_survival -> leave_rule -> figures -> learning_fatigue -> models
-  cross_dataset/     summary_stats.py (one json over all datasets), reward_effect.py, edges.py
+  cross_dataset/     summary_stats.py (one json over all datasets), reward_effect.py, edges.py, edge_compare.py
   report/            summary_md.py, make_slides.py + deck_spec.py (slide text), slides_pdf.py, gallery.py
   vendored/          glmhmm.py, drift.py (switching and drifting models used by models.py)
   tools/             stage_lines.py
@@ -72,7 +72,8 @@ be re-run alone, e.g. `--steps figures` after changing `figures.py`.
 Poster figures across datasets come from `summarize`/`report` (run `analyze` on each dataset first):
 `cross_dataset/reward_effect.py` compares reward-active flies against the no-ATR control (earlier 50/50
 task only, the one dataset with a control of the same genotype); `cross_dataset/edges.py` is the time
-spent around the four patch edges and how the extra time adds up with distance; `summary_stats.py`
+spent around the four patch edges and how the extra time adds up with distance;
+`cross_dataset/edge_compare.py` compares patch 1 with patch 2 around the edges (-5 to +5 units, every dataset, error bars; plain and baseline-subtracted versions, plus a paired per-fly table); `summary_stats.py`
 collects the numbers every report reads (`summary.json`).
 
 Other flags: `--dates D [D ...]`, `--min-leaves N` (visits per patch for a fly to enter

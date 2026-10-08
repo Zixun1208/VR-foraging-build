@@ -56,12 +56,14 @@ def do_analyze(a):
 
 
 def do_summarize(a):
-    from .cross_dataset import edges, reward_effect, summary_stats
+    from .cross_dataset import edge_compare, edges, reward_effect, summary_stats
     for mod in (reward_effect, summary_stats):
         sys.argv = [mod.__name__]
         mod.main()
     sys.argv = ["edges"]
     edges.main()
+    sys.argv = ["edge_compare"]
+    edge_compare.main()
 
 
 def do_report(a):
