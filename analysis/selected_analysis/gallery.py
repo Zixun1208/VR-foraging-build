@@ -135,7 +135,14 @@ def build(runs, summ, out):
             ("edge_cumulative.png", "Time added up around the four patch edges",
              "Running total of trial time from 15 units before each edge, no baseline, so it only rises. A steeper stretch means more time there."),
             ("corridor_cumulative.png", "Time added up along the corridor",
-             "The real running total: the share of trial time spent before each corridor position, from the start of the corridor (mean over flies). A steeper stretch means more time there; the dotted line is an even pace. Shaded bands are the patches.")]
+             "The real running total: the share of trial time spent before each corridor position, from the start of the corridor (mean over flies). A steeper stretch means more time there; the dotted line is an even pace. Shaded bands are the patches."),
+            ("patch_trajectory_examples.png", "Trajectories inside a patch",
+             "Position inside patch 1 against time since entering, random visits per dataset (training)."),
+            ("patch_trajectory_metrics.png", "Walking inside a patch: path, speed and turns",
+             "Per-fly means over patch visits: time, path length / time, path length, backward share, turns back of 2 or more units."),
+            ("trial_view_split_line.png", "Whole trials, split line",
+             "One split-line fly, position against time; shaded bands are the patches, green is time inside them."),
+            ("trial_view_50-50.png", "Whole trials, 50/50 task", "The same for one fly of the 50/50 task.")]
     shown = [(n, t, c) for n, t, c in edge if os.path.isfile(os.path.join(out, n))]
     if shown:
         parts.append("<div class='sec' id='edges'><h1>Around the patch edges</h1><p>All datasets together, for the four edges. "

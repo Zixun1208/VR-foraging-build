@@ -68,6 +68,18 @@ EDGE_NOTE = ("The jump comes at the edge itself, then time keeps adding up more 
 
 EDGE_NOTE_PLAIN = ("Running total of trial time from 15 units before each edge, with no baseline taken off, so every curve only rises; a steeper stretch means more time spent there.")
 
+TRAJ_NOTES = {
+    "patch_trajectory_examples.png": ("Corridor position inside patch 1 against time since entering, for randomly chosen visits (training). "
+        "Traces climb in steps with flat stretches between; there is no large sawtooth."),
+    "patch_trajectory_metrics.png": ("Per fly, the mean over patch visits (training): time in the patch, path length divided by time, path length, "
+        "share of the path walked backward, and turns back of at least 2 units. Path length is about 2.5 to 3.5 times the net forward distance in every "
+        "dataset, and speed along the path is similar in the 50/50 task and the split line (about 3 units/s in patch 1), so fast pacing inside the zone does not explain a flat time in patch. "
+        "The split line has somewhat more turns back (about 3 per visit against 1 to 2) and longer visits."),
+    "trial_view_split_line.png": ("Whole trials from one split-line fly, position against time. Shaded bands are the patches and the green stretches are the time inside them. "
+        "The fly crawls forward in small steps inside the patches, with pauses, and does not walk back and forth."),
+    "trial_view_50-50.png": "The same for one fly of the 50/50 task. A vertical line at the start of a trial is the position resetting.",
+}
+
 EDGE_NOTE_CORRIDOR = ("The real running total: the share of trial time spent before each corridor position, from the start of the corridor (mean over flies). A steeper stretch means more time there; the dotted line is an even pace. Shaded bands are the patches.")
 
 CAVEATS = [
@@ -208,10 +220,14 @@ def main():
     for name, title in (("edge_profiles_by_patch.png", "Time around the four patch edges"),
                         ("edge_accumulation.png", "Extra time added up around the four patch edges"),
                         ("edge_cumulative.png", "Time added up around the four patch edges"),
-                        ("corridor_cumulative.png", "Time added up along the corridor")):
+                        ("corridor_cumulative.png", "Time added up along the corridor"),
+                        ("patch_trajectory_examples.png", "Trajectories inside a patch"),
+                        ("patch_trajectory_metrics.png", "Walking inside a patch: path, speed and turns"),
+                        ("trial_view_split_line.png", "Whole trials, split line"),
+                        ("trial_view_50-50.png", "Whole trials, 50/50 task")):
         if os.path.isfile(os.path.join(a.out, name)):
             copy_fig(os.path.join(a.out, name), os.path.join(a.out, "figs", name))
-            md += [f"## {title}", "", EDGE_NOTE_PLAIN if "edge_cumulative" in name else EDGE_NOTE if "accumulation" in name else EDGE_NOTE_CORRIDOR if "corridor" in name else EDGE_NOTE_PROFILE, "", f"![{title}](figs/{name})", ""]
+            md += [f"## {title}", "", TRAJ_NOTES[name] if name in TRAJ_NOTES else EDGE_NOTE_PLAIN if "edge_cumulative" in name else EDGE_NOTE if "accumulation" in name else EDGE_NOTE_CORRIDOR if "corridor" in name else EDGE_NOTE_PROFILE, "", f"![{title}](figs/{name})", ""]
     for d in summ["datasets"]:
         md += [f"## {d['label']}", "", f"{d['flies']} flies, {d['episodes']} patch visits.", ""]
         for rel, title, cap in FIGS:

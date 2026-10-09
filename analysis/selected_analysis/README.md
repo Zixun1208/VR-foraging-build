@@ -46,6 +46,9 @@ Poster figures for every dataset, and across datasets (run the pipeline on each 
   switching and drifting code is vendored in `glmhmm.py` and `drift.py`)
 - `reward_effect.py` reward-active flies against the no-ATR control, for the earlier 50/50 task only (the one dataset with a control of the same genotype)
 - `edges.py` time spent around the four patch edges (onset and offset of each patch) and how the extra time adds up with distance, all datasets together
+- `patch_trajectory.py` inside a patch: path length, speed along the path, share walked backward and turns back per visit, plus example traces (`patch_visits.csv`, two figures)
+- `trial_view.py` whole-trial position-against-time grids for one fly (`--list` shows the flies)
+- `run_summary.py --stage <dir>` runs all the cross-dataset steps in order (stats, edges, patch_trajectory, trial_view, md, slides, pdf, gallery)
 - `stage_lines.py` stages a `<line>/sub-N/` dataset as `<date>/<task>/<sub>/` with symlinks
 - `summary_stats.py` -> `summary_md.py` / `make_slides.py` / `slides_pdf.py` / `gallery.py` write
   `summary.json`, `foraging_summary.md`, `foraging_summary.pptx`, `foraging_summary.pdf` and

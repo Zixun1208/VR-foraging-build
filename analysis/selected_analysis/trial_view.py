@@ -74,6 +74,7 @@ def main():
     ap.add_argument("--dataset", default="split line", choices=list(COLORS))
     ap.add_argument("--fly", default=None)
     ap.add_argument("--n", type=int, default=12)
+    ap.add_argument("--png", default=None, help="output file name (default trial_view_<dataset>_<fly>.png)")
     ap.add_argument("--list", action="store_true")
     a = ap.parse_args()
     found = find(a)
@@ -88,7 +89,7 @@ def main():
     ps = [p for p in ps if trials.trial_ok(p)]
     idx = np.linspace(0, len(ps) - 1, min(a.n, len(ps))).astype(int)      # spread over the session
     os.makedirs(a.out, exist_ok=True)
-    out = os.path.join(a.out, f"trial_view_{d.replace(' ', '_').replace('/', '-')}_{f}.png")
+    out = os.path.join(a.out, a.png or f"trial_view_{d.replace(' ', '_').replace('/', '-')}_{f}.png")
     draw([ps[i] for i in idx], f"{d}, fly {f}, {a.phase} ({len(idx)} of {len(ps)} trials; shaded = patches)", out)
     print("wrote", out)
 

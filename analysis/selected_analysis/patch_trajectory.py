@@ -139,7 +139,7 @@ def main():
     ap.add_argument("--stage", required=True)
     ap.add_argument("--out", default="runs/summary")
     ap.add_argument("--phase", default="training", choices=["training", "probing"])
-    ap.add_argument("--min-swing", type=float, default=0.5, help="smallest back-and-forth swing counted (units)")
+    ap.add_argument("--min-swing", type=float, default=2.0, help="smallest back-and-forth swing counted (units)")
     ap.add_argument("--example-patch", default="patch 1", choices=list(PATCHES))
     ap.add_argument("--n-examples", type=int, default=12)
     a = ap.parse_args()
