@@ -189,16 +189,16 @@ def slides(summ, figs):
                              "In probing the curves follow the even-pace line."]})
 
     if os.path.isfile(f("patch_trajectory_metrics.png")):
-        out.append({"type": "image_text", "layout": "below", "title": "Inside a patch: not pacing back and forth",
+        out.append({"type": "image_text", "layout": "below", "title": "Inside a patch: path, speed and turns",
                     "image": f("patch_trajectory_metrics.png"),
                     "text": ["Per fly, mean over patch visits (training). Path length is about 3 times the net forward distance in every dataset, "
                              "and speed along the path is similar for the 50/50 task and the split line (about 3 units/s in patch 1). "
-                             "The split line has a few more turns back (about 3 per visit against 1 to 2) and longer visits, not shorter."]})
+                             "So the split line is not faster along its path than the 50/50 task. It does turn back a little more (about 3 per visit against 1 to 2) and its visits are longer, not shorter."]})
     if os.path.isfile(f("trial_view_split_line.png")):
         out.append({"type": "image_text", "layout": "below", "title": "Whole trials, one split-line fly",
                     "image": f("trial_view_split_line.png"),
-                    "text": ["Shaded: the patches; green: time inside them. Inside a patch the fly crawls forward in small steps with pauses, "
-                             "so a flat time in patch comes from slow, stop-and-go progress rather than fast back-and-forth walking."]})
+                    "text": ["Shaded: the patches; green: time inside them. Inside a patch the fly moves forward in small steps with pauses, "
+                             "and the few turns back are small. These are 12 trials from one fly, so they illustrate the numbers and do not replace them."]})
     if os.path.isfile(f("trial_view_50-50.png")):
         out.append({"type": "image_text", "layout": "below", "title": "Whole trials, one 50/50 fly",
                     "image": f("trial_view_50-50.png"),

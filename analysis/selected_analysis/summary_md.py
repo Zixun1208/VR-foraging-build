@@ -70,13 +70,13 @@ EDGE_NOTE_PLAIN = ("Running total of trial time from 15 units before each edge, 
 
 TRAJ_NOTES = {
     "patch_trajectory_examples.png": ("Corridor position inside patch 1 against time since entering, for randomly chosen visits (training). "
-        "Traces climb in steps with flat stretches between; there is no large sawtooth."),
+        "Traces climb in steps with flat stretches between; large sawtooth swings are not seen in these examples."),
     "patch_trajectory_metrics.png": ("Per fly, the mean over patch visits (training): time in the patch, path length divided by time, path length, "
         "share of the path walked backward, and turns back of at least 2 units. Path length is about 2.5 to 3.5 times the net forward distance in every "
-        "dataset, and speed along the path is similar in the 50/50 task and the split line (about 3 units/s in patch 1), so fast pacing inside the zone does not explain a flat time in patch. "
+        "dataset, and speed along the path is similar in the 50/50 task and the split line (about 3 units/s in patch 1), so the split line is not faster along its path, and faster back-and-forth walking does not account for a flat time in patch. "
         "The split line has somewhat more turns back (about 3 per visit against 1 to 2) and longer visits."),
     "trial_view_split_line.png": ("Whole trials from one split-line fly, position against time. Shaded bands are the patches and the green stretches are the time inside them. "
-        "The fly crawls forward in small steps inside the patches, with pauses, and does not walk back and forth."),
+        "The fly crawls forward in small steps inside the patches, with pauses; turns back are small. These are 12 trials from one fly, an illustration and not a measurement."),
     "trial_view_50-50.png": "The same for one fly of the 50/50 task. A vertical line at the start of a trial is the position resetting.",
 }
 
