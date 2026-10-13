@@ -2,7 +2,7 @@
 
     python -m selected_analysis stage       [--recommend]        link the 1D line sessions (and write selections)
     python -m selected_analysis analyze     [--sets NAME ...]    per-dataset pipeline for every run set
-    python -m selected_analysis summarize                        cross-dataset numbers + figures (edges, reward effect)
+    python -m selected_analysis summarize                        cross-dataset numbers + figures (reward effect, edges, patch trajectories, whole trials)
     python -m selected_analysis report                           summary.md, slides, PDFs and the all-figures gallery
     python -m selected_analysis all                              the four above, in order
 
@@ -56,7 +56,7 @@ def do_analyze(a):
 
 
 def do_summarize(a):
-    from .cross_dataset import edge_compare, edges, reward_effect, summary_stats
+    from .cross_dataset import edge_compare, edges, patch_trajectory, reward_effect, summary_stats, trial_view
     for mod in (reward_effect, summary_stats):
         sys.argv = [mod.__name__]
         mod.main()
@@ -64,6 +64,11 @@ def do_summarize(a):
     edges.main()
     sys.argv = ["edge_compare"]
     edge_compare.main()
+    sys.argv = ["patch_trajectory"]
+    patch_trajectory.main()
+    for dataset, png in (("split line", "trial_view_split_line.png"), ("50/50 (Gr64f)", "trial_view_50-50.png")):
+        sys.argv = ["trial_view", "--dataset", dataset, "--png", png]
+        trial_view.main()
 
 
 def do_report(a):

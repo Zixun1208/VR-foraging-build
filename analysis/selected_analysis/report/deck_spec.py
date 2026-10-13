@@ -172,8 +172,37 @@ def slides(summ, figs):
                     "image": f("edge_profiles_by_patch.png"),
                     "text": ["Patch 1 and patch 2, entrance (onset) and exit (offset), for training and probing. "
                              "The entrance spike is bigger at patch 2 than at patch 1, and only the OO line (and a little GO) has an exit peak."]})
-        out.append({"type": "image_text", "layout": "below", "title": "Extra time adds up within about 5 units of the edge",
-                    "image": f("edge_accumulation.png"), "text": ["The jump comes at the edge itself, then time keeps adding up more slowly. Reward-active flies add roughly 5 to 12% of trial time within 5 units after an entrance, and the split line builds up more slowly. The OO line adds time after the exits instead (about 7 to 8% by 5 units). Probing is flat and noisy, and the no-ATR control shows no entrance jump."]})
+        out.append({"type": "image_text", "layout": "below", "title": "Time adds up fastest within 5 units after an entrance",
+                    "image": f("edge_cumulative.png"), "text": ["Running total of trial time from 15 units before each edge (no baseline, so it only rises). "
+                             "Most reward-active lines go from about 8 to 10% just before an entrance to 17 to 23% at +5 units; the no-ATR control rises only 1 to 2 points. "
+                             "The OO line climbs less at entrances (3 to 4 points) but about 10 points after the exits, against about 4 for the 50/50 line. Probing is flat and noisy."]})
+        out.append({"type": "image_text", "layout": "below", "title": "The same, as extra time over each edge's own baseline",
+                    "image": f("edge_accumulation.png"), "text": ["Each edge's baseline is the mean share 15 to 9 units before it, and the curve adds up what is above or below it. "
+                             "It dips where flies move faster than their baseline, such as after patch 2 exits, so it is not a total of time. "
+                             "Reward-active flies add roughly 5 to 12% within 5 units after an entrance, and the no-ATR control shows no entrance jump."]})
+
+    if os.path.isfile(f("corridor_cumulative.png")):
+        out.append({"type": "image_text", "layout": "below", "title": "Time added up along the whole corridor",
+                    "image": f("corridor_cumulative.png"),
+                    "text": ["The real running total of trial time from the start of the corridor, not over a baseline. "
+                             "In training, the curves step up at the entrances (20 and 100), and the OO line steps up again after the exits. "
+                             "In probing the curves follow the even-pace line."]})
+
+    if os.path.isfile(f("patch_trajectory_metrics.png")):
+        out.append({"type": "image_text", "layout": "below", "title": "Inside a patch: path, speed and turns",
+                    "image": f("patch_trajectory_metrics.png"),
+                    "text": ["Per fly, mean over patch visits (training). Path length is about 3 times the net forward distance in every dataset, "
+                             "and speed along the path is similar for the 50/50 task and the split line (about 3 units/s in patch 1). "
+                             "So the split line is not faster along its path than the 50/50 task. It does turn back a little more (about 3 per visit against 1 to 2) and its visits are longer, not shorter."]})
+    if os.path.isfile(f("trial_view_split_line.png")):
+        out.append({"type": "image_text", "layout": "below", "title": "Whole trials, one split-line fly",
+                    "image": f("trial_view_split_line.png"),
+                    "text": ["Shaded: the patches; green: time inside them. Inside a patch the fly moves forward in small steps with pauses, "
+                             "and the few turns back are small. These are 12 trials from one fly, so they illustrate the numbers and do not replace them."]})
+    if os.path.isfile(f("trial_view_50-50.png")):
+        out.append({"type": "image_text", "layout": "below", "title": "Whole trials, one 50/50 fly",
+                    "image": f("trial_view_50-50.png"),
+                    "text": ["The same view for the 50/50 task: the same slow, stepwise crossing of each patch."]})
 
     if os.path.isfile(f("edge_window_plain.png")):
         out.append({"type": "image_text", "layout": "wide", "title": "Patch 1 against patch 2 around the edges",

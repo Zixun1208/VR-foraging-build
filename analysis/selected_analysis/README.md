@@ -69,12 +69,16 @@ be re-run alone, e.g. `--steps figures` after changing `figures.py`.
 | `figures` | `figures.py` | time at each position (lines and heatmaps), speed, approach speed, FicTrac velocity, how the reward runs out, when flies leave each patch, early vs late time in patch |
 | `learning_fatigue` | `learning_fatigue.py` | dwell, speed, moving fraction, stall and inter-patch speed against trial index; per-fly slopes, exact sign-flip and signed-rank tests, training vs probing, baseline reference (see `../learning_fatigue/README.md`) |
 
-Poster figures across datasets come from `summarize`/`report` (run `analyze` on each dataset first):
-`cross_dataset/reward_effect.py` compares reward-active flies against the no-ATR control (earlier 50/50
-task only, the one dataset with a control of the same genotype); `cross_dataset/edges.py` is the time
-spent around the four patch edges and how the extra time adds up with distance;
-`cross_dataset/edge_compare.py` compares patch 1 with patch 2 around the edges (-5 to +5 units, every dataset, error bars; plain and baseline-subtracted versions, plus a paired per-fly table); `summary_stats.py`
-collects the numbers every report reads (`summary.json`).
+Poster figures across datasets come from `summarize` and `report` (run `analyze` on each dataset first):
+
+- `cross_dataset/reward_effect.py` reward-active flies against the no-ATR control, for the earlier 50/50 task only (the one dataset with a control of the same genotype)
+- `cross_dataset/edges.py` time spent around the four patch edges, how the extra time adds up (with and without baseline), and the running total along the corridor
+- `cross_dataset/edge_compare.py` patch 1 against patch 2 around the edges (-5 to +5 units, every dataset, plain and baseline-subtracted, plus a paired per-fly table)
+- `cross_dataset/patch_trajectory.py` inside a patch: path length, speed along the path, share walked backward and turns back per visit, plus example traces (`patch_visits.csv`)
+- `cross_dataset/trial_view.py` whole-trial position-against-time grids for one fly (`--list` shows the flies)
+- `cross_dataset/summary_stats.py` collects the numbers every report reads (`summary.json`)
+- `tools/stage_lines.py` stages a `<line>/sub-N/` dataset as `<date>/<task>/<sub>/` with symlinks
+- `report/` (`summary_md.py`, `make_slides.py`, `slides_pdf.py`, `gallery.py`) write `foraging_summary.md`, `.pptx`, `.pdf` and `all_figures.pdf` into `runs/summary/`. Slide content is in `report/deck_spec.py`; the prose there and in `summary_md.py` is written by hand against the numbers, so re-read it after new data. The PDFs use headless Chromium, which cannot write to hidden folders.
 
 Other flags: `--dates D [D ...]`, `--min-leaves N` (visits per patch for a fly to enter
 `leave_rule`, default 3), `--out-root`, and `--dry-run` to list what would run and write
