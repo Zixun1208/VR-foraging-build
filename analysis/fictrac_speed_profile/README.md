@@ -145,3 +145,26 @@ from the same 5 sessions, 15 clips with seed 1. Each covers 30 frames before to 
 In the deck folder they are in `video_check/clips/` (with `clips.csv`).
 
     python3 burst_clips.py --video VIDEO_DIR --out video_check/clips --n 3
+
+## Update Nov 11: inverted 50/50 (reversed V) at five sessions
+
+Three split-line reward type 3 sessions (2026-11-06 sub-1 and sub-2, 2026-11-10 sub-1) were copied
+from the rig and added, bringing `split_type3` from 2 to 5 sessions. The trial list now comes from
+`trial_list.py` (built from the deck's `session_inventory.csv` with `build_review.py`'s rule; identical
+to `trial_audit.csv` for the 53 earlier sessions). `burst_detail.py` now includes `split_type3`. All
+rows of the other cohorts are unchanged.
+
+| Reversed V (zone 1 = 2.5 V, zone 2 = 1.0 V), probing | value |
+|---|---|
+| zone 1 minus flanks, equal-trial, with / without bursts | +0.11 / +0.07 (3/5 positive) |
+| zone 2 minus flanks, equal-trial, with / without bursts | +0.01 / −0.45 |
+| behavioural bursts (3-30 frames, forward, error < 15000) | 9 in 4 sessions (8 in zone 2) |
+| sessions with more zone than outside bursts | 4 of 5 (p = .125) |
+| zone 2 burst rate higher than zone 1 | 4 of 5 (p = .125) |
+
+Reversed V shows no speed bump and few bursts. The few it has favour zone 2, as in split 50/50,
+where zone 2 is the 2.5-V zone. So the burst location follows position rather than voltage, but
+on 9 bursts. Zone time in training (deck slide 34) points the other way: zone 1, the 2.5-V zone, is
+longer in 4 of 5 sessions (p = .125).
+
+How to rerun everything: `../RUN_FULL_ANALYSIS.md` and `deck/run_update.sh`.

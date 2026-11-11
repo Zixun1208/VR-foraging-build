@@ -21,6 +21,8 @@ Outputs in burst_detail/:
   triggered.npz          burst-triggered speed, per session mean (cohort/phase), -1 s .. +2 s
   summary.json           the numbers quoted on the slides
 
+Cohorts: Gr64f 50/50, split line 50/50, split line 50/50 reversed V (split_type3), split line 20/100.
+
 Run (about 5 min):  python3 burst_detail.py
 """
 from __future__ import annotations
@@ -38,7 +40,10 @@ import fictrac_speed_profile as FT
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "burst_detail")
-COHORTS = ["past_50_50", "split_line", "split_type2"]   # Gr64f 20/100 has no FicTrac .dat
+COHORTS = ["past_50_50", "split_line", "split_type3", "split_type2"]   # Gr64f 20/100 has no FicTrac .dat
+# trial list: trial_list.csv next to this script (trial_list.py, includes newly added sessions) if present,
+# else the deck's speed_trajectory_review/trial_audit.csv
+AUDIT = os.path.join(HERE, "trial_list.csv") if os.path.isfile(os.path.join(HERE, "trial_list.csv")) else FT.AUDIT
 PHASES = ["training", "probing"]
 BURST = 45.0
 ERR_CUT = 15000.0
@@ -87,7 +92,7 @@ def sign_flip(d):
 
 
 def collect():
-    a = pd.read_csv(FT.AUDIT)
+    a = pd.read_csv(AUDIT)
     a = a[a.cohort.isin(COHORTS)]
     bursts, trials, trig = [], [], []
     sessions = list(a.groupby(["cohort", "session_id"], sort=False))
@@ -150,7 +155,7 @@ def light_at_bursts(b):
     The burst's system time is ms since local midnight, the same clock as the trial CSV.
     """
     import datetime
-    paths = pd.read_csv(FT.AUDIT).set_index(["session_id", "trial"]).path
+    paths = pd.read_csv(AUDIT).set_index(["session_id", "trial"]).path
     b = b.copy()
     for col in ["light_on", "light_volts", "light_start_volts", "light_elapsed_s"]:
         b[col] = np.nan

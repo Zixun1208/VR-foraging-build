@@ -1,5 +1,5 @@
 """Add the split-line zone 1 vs zone 2 time comparison to the appendix (own section, right after
-APPENDIX · FLOOR VOLTAGE).
+APPENDIX · FLOOR VOLTAGE). Panels: split 50/50, split 50/50 reversed V (zone 1 is the 2.5-V zone), split 20/100.
 Idempotent. Run AFTER burst_slides.py, then render_decks.py and validate_report.py:
     python3 zone_time_slides.py && python3 render_decks.py --deck foraging_progress_report && python3 validate_report.py
 Inputs: the split-line survival tables (1-s bins). Zone time per trial = number of 1-s bins in that zone
@@ -31,10 +31,14 @@ SECTION = 'APPENDIX · ZONE TIME'
 BROWN = '#8A4311'
 COH = [('split_line', 'Split line · 50/50', ORANGE, A / 'selected_analysis/runs/split_line/50_50/survival.csv',
         'zone 1 starts at 1.0 V, zone 2 at 2.5 V'),
+       ('split_type3', 'Split line · 50/50 reversed V', '#8454A0', A / 'split_line_20261106/results/reward_type_3/50_50/survival.csv',
+        'zone 1 starts at 2.5 V, zone 2 at 1.0 V'),
        ('split_type2', 'Split line · 20/100', BROWN, A / 'split_line_20261106/results/reward_type_2/20_100/survival.csv',
         'both zones start at 2.5 V')]
-REVERSED = A / 'split_line_20261106/results/reward_type_3/50_50/survival.csv'
-WORDS = {2: 'two', 3: 'three', 4: 'four', 5: 'five', 12: 'twelve', 15: 'fifteen'}
+REVERSED = COH[1][3]
+TITLE = ('In 50/50 training the split line stays longer in the 2.5-V zone; '
+         'the reversed order (five sessions) points the same way.')
+WORDS = {0: 'none', 1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five', 12: 'twelve', 15: 'fifteen'}
 
 
 def sha(p):
@@ -83,7 +87,7 @@ def figure():
     plt.rcParams.update(PLOT_STYLE)
     ev = dict(measure='Tz: total time in zone per trial, 1-s survival bins, QC-passing trials', cohorts={}, sources={})
     tables = []
-    fig, axes = plt.subplots(1, 2, figsize=(14, 4.9), sharey=True)
+    fig, axes = plt.subplots(1, len(COH), figsize=(14, 4.9), sharey=True)
     for ax, (c, label, col, path, volts) in zip(axes, COH):
         ev['sources'][str(path)] = sha(path)
         r = session_table(zone_times(path)).assign(cohort=c)
@@ -100,8 +104,8 @@ def figure():
             w = stats.wilcoxon(q.z1, q.z2).pvalue
             z2h, z1h = int((q.z2 > q.z1).sum()), int((q.z1 > q.z2).sum())
             nsig = int((q.p_trials < .05).sum())
-            ax.text(k + .5, 31.5, f'zone 2 longer {z2h}, zone 1 longer {z1h}\nof {len(q)} sessions · {pval(w)}',
-                    ha='center', va='top', fontsize=10.5, color=INK, fontweight='bold' if w < .05 else 'normal')
+            ax.text(k + .5, 31.5, f'zone 2 longer {z2h},\nzone 1 longer {z1h}\nof {len(q)} · {pval(w)}',
+                    ha='center', va='top', fontsize=9.5, color=INK, fontweight='bold' if w < .05 else 'normal')
             ev['cohorts'][c][ph] = dict(sessions=len(q), zone1_median=float(q.z1.median()), zone2_median=float(q.z2.median()),
                                         zone2_longer=z2h, zone1_longer=z1h, p_sessions=float(w),
                                         single_fly_p05=nsig,
@@ -115,11 +119,11 @@ def figure():
         ax.set_xlim(-.6, 3.6)
         ax.set_ylim(0, 32)
         ax.grid(axis='y', alpha=.12)
-        ax.set_title(f'{label} · {r.session.nunique()} sessions · {volts}')
+        ax.set_title(f'{label.replace("Split line", "Split")} · {r.session.nunique()} sessions\n{volts}', fontsize=11.5)
     axes[0].set_ylabel('Median zone time per trial (s)')
     axes[0].plot([], [], 'o-', color=MUTED, mfc=MUTED, label='this fly differs between zones\n(trials paired, p < .05)')
     axes[0].plot([], [], 'o-', color=MUTED, mfc='white', alpha=.6, label='this fly: no difference')
-    axes[0].legend(frameon=False, fontsize=10, loc='center right', bbox_to_anchor=(1, .55))
+    axes[0].legend(frameon=False, fontsize=9, loc='center right', bbox_to_anchor=(1.02, .5))
     fig.tight_layout()
     fig.subplots_adjust(bottom=.17)
     fig.savefig(F / 'zone_time_split_line.png', dpi=210, facecolor='white')
@@ -137,19 +141,20 @@ def figure():
 def slide(ev):
     s5, s2 = ev['cohorts']['split_line'], ev['cohorts']['split_type2']
     t5, p5, t2, p2 = s5['training'], s5['probing'], s2['training'], s2['probing']
+    s3 = ev['cohorts']['split_type3']
+    t3, p3 = s3['training'], s3['probing']
     w = lambda n: WORDS.get(n, str(n))
-    rv = [r for r in ev['reversed'] if r['phase'] == 'training']
     return dict(
         file='zone_time_split_line.png', group='zone_time', diagnostic='zone_time_split_line',
-        title='In 50/50 training the split line stays longer in zone 2; probing shows no zone difference.',
+        title=TITLE,
         coverage='Dots: session medians · bars: medians across sessions · top text: Wilcoxon signed-rank across sessions, uncorrected',
-        note=(f'50/50 training: {t5["zone2_median"]:.1f} s in zone 2 vs {t5["zone1_median"]:.1f} s in zone 1; '
-              f'{w(t5["single_fly_p05_direction"]["zone2"])} of {w(t5["sessions"])} flies differ on their own, all toward zone 2 '
-              f'({w(t5["single_fly_bh05"])} after Benjamini–Hochberg). 50/50 probing: none after correction. '
-              f'20/100: zone 1 slightly longer in training ({t2["zone1_median"]:.1f} vs {t2["zone2_median"]:.1f} s) and zone 2 in probing '
-              f'({p2["zone2_median"]:.1f} vs {p2["zone1_median"]:.1f} s); no single fly survives correction. '
-              f'Training zone time partly follows the decay schedule, so this does not separate preference from protocol. '
-              f'Reversed-voltage sessions ({w(len(rv))}) are too few to test.'),
+        note=(f'50/50 training: {t5["zone2_median"]:.1f} s in zone 2 (2.5 V) vs {t5["zone1_median"]:.1f} s in zone 1; '
+              f'{w(t5["single_fly_p05_direction"]["zone2"])} of {w(t5["sessions"])} flies differ alone, all toward zone 2 '
+              f'({w(t5["single_fly_bh05"])} after Benjamini–Hochberg). '
+              f'Reversed V training: {t3["zone1_median"]:.1f} s in zone 1 (2.5 V) vs {t3["zone2_median"]:.1f} s; '
+              f'{w(t3["single_fly_p05_direction"]["zone1"])} flies differ alone toward zone 1, {w(t3["single_fly_p05_direction"]["zone2"])} toward zone 2. '
+              f'20/100 (equal voltages): zone 1 {t2["zone1_median"]:.1f} vs {t2["zone2_median"]:.1f} s in training ({pval(t2["p_sessions"])}), '
+              f'zone 2 {p2["zone2_median"]:.1f} vs {p2["zone1_median"]:.1f} s in probing ({pval(p2["p_sessions"])}); no single fly survives correction.'),
         cohorts=[c for c, *_ in COH], source_sha256=ev['sources'])
 
 

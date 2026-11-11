@@ -1,5 +1,6 @@
 """Add the detailed fast-burst analysis (both genetic lines, training and probing) to the
-speed-diagnostics appendix.
+speed-diagnostics appendix. Cohorts: Gr64f 50/50, split line 50/50, split line 50/50 reversed V
+(split_type3: zone 1 starts at 2.5 V, zone 2 at 1.0 V; added Nov 11) and split line 20/100.
 
 Idempotent. Run AFTER fictrac_slides.py (which re-places its own slides at the end of the speed
 appendix), then render_decks.py and validate_report.py:
@@ -34,10 +35,12 @@ BACKUP = B / 'before_burst_detail_20261111'
 SECTION = FD.APPENDIX_BUMP
 BROWN = '#8A4311'
 GREY = '#9AA7AD'
+PURPLE = '#8454A0'
 COH = [('past_50_50', 'Gr64f · 50/50', TEAL), ('split_line', 'Split line · 50/50', ORANGE),
-       ('split_type2', 'Split line · 20/100', BROWN)]
+       ('split_type3', 'Split · 50/50 reversed V', PURPLE), ('split_type2', 'Split line · 20/100', BROWN)]
 KEYS = [c for c, _, _ in COH]
-WORDS = {12: 'twelve', 15: 'fifteen'}
+WORDS = {2: 'two', 3: 'three', 4: 'four', 5: 'five', 6: 'six', 11: 'eleven', 12: 'twelve', 15: 'fifteen'}
+w_ = lambda n: WORDS.get(n, str(n))
 
 
 def sha(p):
@@ -56,6 +59,8 @@ def backup():
 
 
 def pval(p):
+    if not np.isfinite(p):        # every session has the same value (e.g. no bursts at all)
+        return 'no bursts'
     return 'p < .001' if p < .001 else f'p = {p:.3f}'.replace('0.', '.')
 
 
@@ -73,7 +78,7 @@ def figures():
               training_light=summ['training_light'], tests={})
 
     # 1. session rates: outside vs zones, training and probing
-    fig, axes = plt.subplots(1, 3, figsize=(14, 4.9), sharey=True)
+    fig, axes = plt.subplots(1, len(COH), figsize=(14, 4.9), sharey=True)
     cats = [('training', 'outside'), ('training', 'zone'), ('probing', 'outside'), ('probing', 'zone')]
     for ax, (c, label, col) in zip(axes, COH):
         w = sr[sr.cohort == c].pivot_table(index='session_id', columns=['phase', 'region'], values='rate')
@@ -84,8 +89,8 @@ def figures():
             ax.plot([k - .28, k + .28], [w[cat].median()] * 2, color=INK, lw=3)
         for k, ph in [(0, 'training'), (2, 'probing')]:
             t = test(c, f'{ph}: zones vs outside')
-            ax.text(k + .5, 8.45, f'{int(t.a_higher)} of {int(t.sessions)} higher in zones\n{pval(t.p)}',
-                    ha='center', va='top', fontsize=10.5, color=INK, fontweight='bold' if t.p < .05 else 'normal')
+            ax.text(k + .5, 8.45, f'{int(t.a_higher)} of {int(t.sessions)} higher\nin zones · {pval(t.p)}',
+                    ha='center', va='top', fontsize=9.5, color=INK, fontweight='bold' if t.p < .05 else 'normal')
             ev['tests'][f'{c}_{ph}_zone_vs_outside'] = dict(higher=int(t.a_higher), lower=int(t.b_higher), sessions=int(t.sessions),
                                                          zone_median=float(t.a_median), outside_median=float(t.b_median), p=float(t.p))
         t = test(c, 'zones: probing vs training')
@@ -97,7 +102,7 @@ def figures():
         ax.set_xlim(-.6, 3.6)
         ax.set_ylim(-.2, 8.6)
         ax.grid(axis='y', alpha=.12)
-        ax.set_title(f'{label} · {nsess[c]} sessions')
+        ax.set_title(f'{label} · {nsess[c]} sess.', fontsize=12.5)
     axes[0].set_ylabel('Bursts per minute in region')
     fig.tight_layout()
     fig.subplots_adjust(bottom=.17)
@@ -125,7 +130,7 @@ def figures():
                 bottom += n
             ticks.append((x, ph[0].upper()))
             x += 1
-        ax.text(x - 1.5, -95, label.replace(' · ', '\n'), ha='center', va='top', fontsize=10.5, color=INK)
+        ax.text(x - 1.5, -95, label.replace(' · ', '\n').replace('Split line', 'Split').replace(' reversed V', '\nrev. V'), ha='center', va='top', fontsize=9, color=INK)
         x += .5
     ax.set_xticks([t for t, _ in ticks])
     ax.set_xticklabels([s for _, s in ticks])
@@ -204,13 +209,13 @@ def figures():
                          for (c, ph), v in z.groupby(['cohort', 'phase'])}
 
     # 4. across the session, and zone 1 vs zone 2
-    fig, axes = plt.subplots(1, 4, figsize=(14, 4.9), gridspec_kw=dict(width_ratios=[1, 1, 1, 1.05]))
+    fig, axes = plt.subplots(1, len(COH) + 1, figsize=(14, 4.9), gridspec_kw=dict(width_ratios=[1] * len(COH) + [1.25]))
     tr = tr.assign(fifth=np.ceil(tr.order_phase / tr.phase_trials * 5).clip(1, 5).astype(int),
                    zb=tr.bursts_z1 + tr.bursts_z2, zt=tr.time_z1 + tr.time_z2)
     s5 = tr.groupby(['cohort', 'session_id', 'phase', 'fifth'])[['zb', 'zt']].sum()
     s5['rate'] = s5.zb / (s5.zt / 60).where(s5.zt > 0)
     ev['fifths'] = {}
-    for ax, (c, label, col) in zip(axes[:3], COH):
+    for ax, (c, label, col) in zip(axes[:len(COH)], COH):
         for ph, ls, colr in [('training', '--', GREY), ('probing', '-', col)]:
             q5 = s5.loc[c].xs(ph, level='phase').rate.groupby('fifth').agg(['mean', 'sem'])
             ax.errorbar(q5.index, q5['mean'], q5['sem'], color=colr, ls=ls, lw=2.1, marker='o', ms=5, capsize=2.5,
@@ -219,13 +224,14 @@ def figures():
         t = test(c, 'probing: second vs first half of trials')
         ev['tests'][f'{c}_probing_second_vs_first_half'] = dict(higher=int(t.a_higher), lower=int(t.b_higher), sessions=int(t.sessions),
                                                              second_median=float(t.a_median), first_median=float(t.b_median), p=float(t.p))
-        ax.text(.04, .97, f'Probing, later half higher:\n{int(t.a_higher)} of {int(t.sessions)} sessions, {pval(t.p)}',
-                transform=ax.transAxes, va='top', fontsize=10.5, color=INK, fontweight='bold' if t.p < .05 else 'normal')
-        ax.set(title=label, xlabel='Fifth of the session’s trials', xticks=range(1, 6), ylim=(-.2, 6.6))
+        ax.text(.04, .97, f'Probing, later half\nhigher: {int(t.a_higher)} of {int(t.sessions)}\n{pval(t.p)}',
+                transform=ax.transAxes, va='top', fontsize=9.5, color=INK, fontweight='bold' if t.p < .05 else 'normal')
+        ax.set(xlabel='Fifth of trials', xticks=range(1, 6), ylim=(-.2, 6.6))
+        ax.set_title(label.replace(' · 50/50 reversed V', ' · rev. V'), fontsize=12)
         ax.grid(alpha=.12)
     axes[0].set_ylabel('Bursts per minute in zones')
     axes[0].legend(frameon=False, fontsize=10, loc='center left', bbox_to_anchor=(0, .62))
-    ax = axes[3]
+    ax = axes[len(COH)]
     w = sr[(sr.phase == 'probing') & sr.region.isin(['zone1', 'zone2'])].pivot_table(index=['cohort', 'session_id'], columns='region', values='rate')
     for k, (c, label, col) in enumerate(COH):
         q = w.loc[c]
@@ -236,10 +242,11 @@ def figures():
         t = test(c, 'probing: zone 1 vs zone 2')
         ev['tests'][f'{c}_probing_zone1_vs_zone2'] = dict(zone1_higher=int(t.a_higher), zone2_higher=int(t.b_higher), sessions=int(t.sessions),
                                                        zone1_median=float(t.a_median), zone2_median=float(t.b_median), p=float(t.p))
-        ax.text(k * 3 + .5, 8.4, pval(t.p), ha='center', va='top', fontsize=10.5, color=INK, fontweight='bold' if t.p < .05 else 'normal')
-    ax.set_xticks([0, 1, 3, 4, 6, 7])
-    ax.set_xticklabels(['1', '2'] * 3)
-    ax.set(title='Zone 1 vs zone 2 · probing', xlabel='Zone', ylabel='Bursts per minute in zone', ylim=(-.2, 8.6), xlim=(-.7, 7.7))
+        ax.text(k * 3 + .5, 8.4, pval(t.p), ha='center', va='top', fontsize=9.5, color=INK, fontweight='bold' if t.p < .05 else 'normal')
+    ax.set_xticks([k * 3 + j for k in range(len(COH)) for j in (0, 1)])
+    ax.set_xticklabels(['1', '2'] * len(COH))
+    ax.set(xlabel='Zone (colours: cohorts)', ylabel='Bursts per minute in zone', ylim=(-.2, 8.6), xlim=(-.7, 3 * len(COH) - 1.3))
+    ax.set_title('Zone 1 vs 2 · probing', fontsize=12)
     ax.grid(axis='y', alpha=.12)
     fig.tight_layout()
     fig.savefig(F / 'burst_detail_trials.png', dpi=210, facecolor='white')
@@ -252,7 +259,10 @@ def slides(ev):
     sources = {str(p.relative_to(B)): sha(p) for p in sorted(SRC.glob('*')) if p.is_file() and p.suffix != '.log'}
     sources['fictrac_speed_20261110/burst_detail.py'] = sha(SRC.parent / 'burst_detail.py')
     common = dict(group='speed_bump', cohorts=KEYS, source_sha256=sources)
-    cover = 'Gr64f 50/50: 12 of 15 sessions have ball data · Split line 50/50: 12 · 20/100: 15 · Gr64f 20/100: no ball data'
+    n = ev['sessions']
+    cover = (f'Sessions with ball data: Gr64f 50/50 {n["past_50_50"]} of 15 · split 50/50 {n["split_line"]} · '
+             f'reversed V {n["split_type3"]} · 20/100 {n["split_type2"]} · Gr64f 20/100 none')
+    rv = lambda k: T[f'split_type3_{k}']
     d = lambda k: f'{Bh[k]["duration_ms_median"]:.0f}'
     lit = sum(v['light_on'] for v in L.values())
     tot = sum(v['bursts'] for v in L.values())
@@ -264,35 +274,40 @@ def slides(ev):
              note=(f'Dots: sessions; bars: medians. Median bursts per zone minute in probing: split line '
                    f'{T["lines_probing_zone"]["split_median"]:.2f} (50/50) and {T["split_type2_probing_zone_vs_outside"]["zone_median"]:.2f} (20/100), '
                    f'Gr64f {T["lines_probing_zone"]["gr64f_median"]:.2f}; the two lines differ on 50/50 ({pval(T["lines_probing_zone"]["p"])}, rank test). '
-                   f'Six of twelve Gr64f sessions have no zone bursts. Paired p-values: exact sign-flip across sessions, uncorrected.'),
+                   f'Reversed V: {rv("probing_zone_vs_outside")["zone_median"]:.2f}, higher in zones in {w_(rv("probing_zone_vs_outside")["higher"])} of '
+                   f'{w_(rv("probing_zone_vs_outside")["sessions"])} ({pval(rv("probing_zone_vs_outside")["p"])}). '
+                   f'Reversed V has only {Bh["split_type3_probing"]["n"]} probing bursts in {w_(Bh["split_type3_probing"]["sessions"])} sessions. '
+                   f'Paired p-values: exact sign-flip across sessions, uncorrected.'),
              **common),
         dict(file='burst_detail_properties.png', diagnostic='burst_properties',
              title='A burst lasts 60–80 ms and rolls the ball forward by 1.2–1.5 rad.',
              coverage='T = training, P = probing · burst = 3–30 frames above 45 units/s, net forward, tracking error under the cutoff',
-             note=(f'Probing medians, Gr64f / split 50/50 / split 20/100: duration {d("past_50_50_probing")} / {d("split_line_probing")} / '
-                   f'{d("split_type2_probing")} ms; peak {Bh["past_50_50_probing"]["peak_median"]:.0f} / {Bh["split_line_probing"]["peak_median"]:.0f} / '
-                   f'{Bh["split_type2_probing"]["peak_median"]:.0f} units/s; distance {Bh["past_50_50_probing"]["displacement_median"]:.1f} / '
-                   f'{Bh["split_line_probing"]["displacement_median"]:.1f} / {Bh["split_type2_probing"]["displacement_median"]:.1f} units (4 units = 1 rad). '
+             note=(f'Probing medians, Gr64f / split 50/50 / reversed V / split 20/100: duration ' + ' / '.join(d(f'{c}_probing') for c in KEYS) + ' ms; '
+                   f'peak ' + ' / '.join(f'{Bh[c + "_probing"]["peak_median"]:.0f}' for c in KEYS) + ' units/s; '
+                   f'distance ' + ' / '.join(f'{Bh[c + "_probing"]["displacement_median"]:.1f}' for c in KEYS) + ' units (4 units = 1 rad). '
                    f'Gr64f recordings also hold many spikes and long poorly tracked runs, so its counts are less certain.'),
              **common),
         dict(file='burst_detail_timing.png', diagnostic='burst_timing',
              title='In probing, split-line bursts start mid-zone about 3 s after entry.',
              coverage='Bursts that start inside a reward zone · right panel: sessions with three or more such bursts, mean ± SEM across sessions',
              note=(f'Median time from zone entry to burst, probing: split line {Z["split_line_probing"]["since_entry_median_s"]:.1f} s (50/50) and '
-                   f'{Z["split_type2_probing"]["since_entry_median_s"]:.1f} s (20/100), Gr64f {Z["past_50_50_probing"]["since_entry_median_s"]:.1f} s. '
+                   f'{Z["split_type2_probing"]["since_entry_median_s"]:.1f} s (20/100), reversed V {Z["split_type3_probing"]["since_entry_median_s"]:.1f} s, '
+                   f'Gr64f {Z["past_50_50_probing"]["since_entry_median_s"]:.1f} s. '
                    f'{Z["split_line_probing"]["left_zone"]:.0%} and {Z["split_type2_probing"]["left_zone"]:.0%} of split-line bursts end past the zone exit. '
                    f'Split-line speed is {ev["triggered"]["split_line"]["before"]:.1f} / {ev["triggered"]["split_type2"]["before"]:.1f} units/s in the second before and '
                    f'{ev["triggered"]["split_line"]["after_0p3_1s"]:.1f} / {ev["triggered"]["split_type2"]["after_0p3_1s"]:.1f} from 0.3 to 1 s after. '
                    f'In training all {lit} of {tot} zone bursts happened with the light still on (63–88% of starting voltage).'),
              **common),
         dict(file='burst_detail_trials.png', diagnostic='burst_trials',
-             title='Bursts become more frequent as the session goes on, and favour zone 2 in the 50/50 task.',
+             title='Bursts become more frequent as the session goes on, and favour zone 2 in both 50/50 voltage orders.',
              coverage='Trials in recorded order, in fifths per session · training and probing trials alternate · mean ± SEM across sessions',
-             note=(f'Split-line probing rate rises from {f5["split_line_probing"][0]:.1f} to {f5["split_line_probing"][-1]:.1f} (50/50) and '
-                   f'{f5["split_type2_probing"][0]:.1f} to {f5["split_type2_probing"][-1]:.1f} (20/100) bursts per zone minute, first to last fifth. '
-                   f'Walking also speeds up across trials, so this is not separated from general speeding. '
-                   f'Zone 2 exceeds zone 1 in {T["split_line_probing_zone1_vs_zone2"]["zone2_higher"]} of the 11 split-line 50/50 sessions with bursts; '
-                   f'no zone difference in 20/100 or Gr64f.'),
+             note=(f'Split probing rate, first to last fifth: {f5["split_line_probing"][0]:.1f} to {f5["split_line_probing"][-1]:.1f} (50/50), '
+                   f'{f5["split_type2_probing"][0]:.1f} to {f5["split_type2_probing"][-1]:.1f} (20/100) per zone minute; walking also speeds up. '
+                   f'Zone 2 higher: split 50/50 (zone 2 = 2.5 V) {T["split_line_probing_zone1_vs_zone2"]["zone2_higher"]} of 11 sessions with bursts '
+                   f'({pval(T["split_line_probing_zone1_vs_zone2"]["p"])}); reversed V (zone 2 = 1.0 V) '
+                   f'{w_(T["split_type3_probing_zone1_vs_zone2"]["zone2_higher"])} of {w_(T["split_type3_probing_zone1_vs_zone2"]["sessions"])} '
+                   f'({pval(T["split_type3_probing_zone1_vs_zone2"]["p"])}, only {Bh["split_type3_probing"]["n"]} bursts), so position, not voltage. '
+                   f'No zone difference in 20/100 or Gr64f.'),
              **common),
     ]
 

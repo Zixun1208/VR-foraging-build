@@ -17,9 +17,12 @@ excluded={'past_50_50_nonatr','past_50_50_nonatr_b','OO','GO','GG','past_20_20',
 cfg=json.loads((B/'source_config.json').read_text())
 assert {g['cohort'] for g in cfg['cohorts']}==keep
 inv=pd.read_csv(B/'session_inventory.csv')
-assert len(inv)==inv.session_id.nunique()==53 and set(inv.cohort)==keep and inv.atr.all()
+# Nov 11: three reversed-V (split_type3) sessions added by add_reversed_sessions.py; the main comparisons stay at 51
+NEW_REV={'split_type3:2026-11-06_sub-1','split_type3:2026-11-06_sub-2','split_type3:2026-11-10_sub-1'}
+assert len(inv)==inv.session_id.nunique()==56 and set(inv.cohort)==keep and inv.atr.all()
+assert NEW_REV<=set(inv.session_id) and (inv.cohort=='split_type3').sum()==5 and (inv.cohort!='split_type3').sum()==51
 assert inv.groupby('protocol_id').cohort.nunique().eq(1).all()
-assert (inv.origin=='added').sum()==17
+assert (inv.origin=='added').sum()==20
 assert len(pd.read_csv(B/'excluded_sessions.csv'))==31
 for source in json.loads((B/'source_tables.json').read_text()):
     p=ROOT/source['path'];assert hashlib.sha256(p.read_bytes()).hexdigest()==source['sha256']
@@ -28,7 +31,10 @@ for source in json.loads((B/'source_tables.json').read_text()):
     assert set(actual.cohort)<=keep
     pd.testing.assert_frame_equal(actual,filtered,check_dtype=False)
 before=pd.read_csv(P/'analyzed_trials.csv');expected=before[before.session_id.isin(inv.session_id)].reset_index(drop=True)
-pd.testing.assert_frame_equal(pd.read_csv(B/'analyzed_trials.csv'),expected,check_dtype=False)
+trials_now=pd.read_csv(B/'analyzed_trials.csv')
+pd.testing.assert_frame_equal(trials_now[~trials_now.session_id.isin(NEW_REV)].reset_index(drop=True),expected,check_dtype=False)
+rev_surv=pd.read_csv(ROOT/'analysis/split_line_20261106/results/reward_type_3/50_50/survival.csv')
+assert set(map(tuple,trials_now[trials_now.session_id.isin(NEW_REV)][['session_id','trial_order','phase']].values))=={('split_type3:'+f,o,ph) for f,o,ph in rev_surv[['fly_id','trial_order','phase']].drop_duplicates().values if 'split_type3:'+f in NEW_REV}
 models=pd.read_csv(B/'expanded/comparison_tables/original_cohort_model_scores.csv')
 assert len(models)==51 and models.cohort.nunique()==4
 cov=pd.read_csv(B/'expanded/spatial_tables/coverage_by_session.csv')
@@ -129,7 +135,13 @@ sel=json.loads((B/'contextual_examples_20261110/selection.json').read_text())
 assert sel['trial_bouts']==len(sel['bouts'])==2 and sel['session_bouts']==77 and sel['session_trials']==30
 assert all(b['backward_units']>=2 and b['backward_duration_s']>=.2-1e-8 for b in sel['bouts'])
 assert sel['cohort'] in keep and sel['phase']=='training'
-for path,digest in sel['source_sha256'].items():assert hashlib.sha256(Path(path).read_bytes()).hexdigest()==digest
+for path,digest in sel['source_sha256'].items():
+    if Path(path).name=='session_inventory.csv':  # grew by the reversed-V rows: the pre-update copy must match, and the rest is unchanged
+        old_inv=B/'before_reversed_v_20261111/session_inventory.csv'
+        assert hashlib.sha256(old_inv.read_bytes()).hexdigest()==digest
+        pd.testing.assert_frame_equal(inv[~inv.session_id.isin(NEW_REV)].reset_index(drop=True),pd.read_csv(old_inv),check_dtype=False)
+        continue
+    assert hashlib.sha256(Path(path).read_bytes()).hexdigest()==digest
 why=json.loads((B/'why_bump_20261110/evidence.json').read_text())
 assert why['trials']==711 and why['trials_with_jump_in_95_130']==115 and why['jumps']==395
 assert why['peak_old_without_jump_trials']<3.5<why['timeweighted_peak']*2 and why['peak_old_all']>7 and why['peak_old_jump_trials']>25
@@ -140,5 +152,5 @@ overflow=B/'review/foraging_progress_report/overflow.json'
 assert overflow.exists() and json.loads(overflow.read_text())==[]
 pdftext=Path('/tmp/gr64f-split-pdf-text.txt')
 if pdftext.exists():assert not re.search(r'\b(?:OO|GO|GG)\b|no[- ]ATR|non[-_ ]?atr|20\s*/\s*20|60\s*/\s*100',pdftext.read_text(),re.IGNORECASE)
-result=dict(status='passed',slides=len(physical_pages),combined_result_slides=6,original_figure_metadata_retained=True,spatial_consolidation=True,models_in_appendix=True,assay_intro_slides=2,appendix_example_slides=6,contextual_example_slides=[p['number'] for p in physical_pages if p.get('contextual_example') or p.get('diagnostic')=='individual'],examples_precede_population=False,backward_example_follows_movement_result=True,speed_why_slide=whyslide[0]['number'],older_peak_absent_without_fast_step_trials=True,backward_example_selection_reproduces_audited_bouts=True,sessions=53,added_sessions=17,source_groups=5,genetic_lines=['Gr64f','Split line'],atr_positive_only=True,spatial_time_profiles=53,spatial_speed_profiles=53,model_sessions=51,definition_slides=sum('definition' in p for p in physical_pages),paired_tests_reported=110,edge_summary_slides=2,models_remain_descriptive=True,equations_match_stored_normalized_differences_baselines_and_cumulative_values=True,equation_glyphs_have_unclipped_margins=True,excluded_groups_absent_from_figures_and_slides=True,excluded_conditions_still_absent=True,source_session_values_preserved=True,parent_report_unchanged=True,text_overflow_candidates=0,output_sha256={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [B/'foraging_progress_report.pptx',B/'foraging_progress_report.pdf']})
+result=dict(status='passed',slides=len(physical_pages),combined_result_slides=6,original_figure_metadata_retained=True,spatial_consolidation=True,models_in_appendix=True,assay_intro_slides=2,appendix_example_slides=6,contextual_example_slides=[p['number'] for p in physical_pages if p.get('contextual_example') or p.get('diagnostic')=='individual'],examples_precede_population=False,backward_example_follows_movement_result=True,speed_why_slide=whyslide[0]['number'],older_peak_absent_without_fast_step_trials=True,backward_example_selection_reproduces_audited_bouts=True,sessions=56,added_sessions=20,reversed_v_sessions=5,main_comparison_sessions=51,source_groups=5,genetic_lines=['Gr64f','Split line'],atr_positive_only=True,spatial_time_profiles=53,spatial_speed_profiles=53,model_sessions=51,definition_slides=sum('definition' in p for p in physical_pages),paired_tests_reported=110,edge_summary_slides=2,models_remain_descriptive=True,equations_match_stored_normalized_differences_baselines_and_cumulative_values=True,equation_glyphs_have_unclipped_margins=True,excluded_groups_absent_from_figures_and_slides=True,excluded_conditions_still_absent=True,source_session_values_preserved=True,parent_report_unchanged=True,text_overflow_candidates=0,output_sha256={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [B/'foraging_progress_report.pptx',B/'foraging_progress_report.pdf']})
 (B/'validation.json').write_text(json.dumps(result,indent=2));print(json.dumps(result,indent=2))
