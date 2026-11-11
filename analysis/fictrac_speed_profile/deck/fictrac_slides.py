@@ -41,9 +41,9 @@ EXAMPLE = dict(cohort='split_line', session='split_line:2026-09-03_sub-2',
 sys.path.insert(0, str(SRC))
 import fictrac_speed_profile as FT  # noqa: E402
 
-FINDING_5 = ('Speed by position: checked against the ball tracker. ',
-             'On FicTrac’s own clock the older 50/50 zone-2 bump is absent and the 20/100 zone-1 rise remains. '
-             'Brief fast ball bursts cluster in the zones during probing (appendix).')
+FINDING_5 = ('Speed by position: zone bumps are brief fast bursts. ',
+             'The ball tracker confirms them: in probing, brief fast ball bursts in the zones make the speed bumps. '
+             'Without bursts the 20/100 zone-1 rise remains (appendix).')
 NEXT_4 = ('Identify the fast bursts. ',
           'Film the fly during probing to tell whether the brief fast ball movements in unrewarded zones '
           'are runs, jumps or kicks.')
@@ -78,10 +78,10 @@ def figures():
 
     # 1. probing speed profiles, four estimators
     fig, axes = plt.subplots(1, 2, figsize=(14, 4.9), sharey=True)
-    lines = [('legacy', INK, '--', 'Older: average of each trial’s speed (Unity log)'),
-             ('unity', TEAL, '-', 'Unity log: distance ÷ time in bin'),
-             ('fictrac', PURPLE, '-', 'FicTrac ball, camera clock'),
-             ('fictrac_noburst', ORANGE, ':', 'FicTrac ball, fast bursts removed')]
+    lines = [('fictrac', '#9AA7AD', '-', 'FicTrac, time-weighted (reference)'),
+             ('legacy', INK, '--', 'Older curve: Unity log, trials averaged equally'),
+             ('fictrac_eq', PURPLE, '-', 'FicTrac ball, trials averaged equally'),
+             ('fictrac_eq_noburst', ORANGE, '-', 'FicTrac ball, equal trials, fast bursts removed')]
     for ax, (c, task, _) in zip(axes, COH):
         d = prof[(prof.cohort == c) & (prof.phase == 'probing')]
         for m, col, ls, lab in lines:
@@ -98,7 +98,7 @@ def figures():
     pick = lambda c, z, m: summ[(summ.cohort == c) & (summ.phase == 'probing') & (summ.zone == z) & (summ.metric == m)].iloc[0]
     ev['contrasts'] = {f'{c}_zone{z}_{m}': dict(mean=float(r['mean']), sem=float(r['sem']), positive=r['positive'])
                        for c in ['split_line', 'split_type2'] for z in [1, 2]
-                       for m in ['legacy', 'unity', 'fictrac', 'fictrac_noburst'] for r in [pick(c, z, m)]}
+                       for m in ['legacy', 'unity', 'fictrac', 'fictrac_noburst', 'fictrac_eq', 'fictrac_eq_noburst'] for r in [pick(c, z, m)]}
 
     # 2. example trial: the burst in the raw ball data
     a = pd.read_csv(FT.AUDIT)
@@ -185,13 +185,13 @@ def slides(ev):
     common = dict(group='speed_bump', cohorts=['split_line', 'split_type2'], source_sha256=sources)
     return [
         dict(file='fictrac_profiles.png', diagnostic='fictrac_profiles',
-             title='On the ball tracker’s own clock, the older 50/50 zone-2 bump is absent.',
+             title='With trials averaged equally, fast ball bursts make the zone bumps.',
              coverage='Split line · probing · 50/50: 12 sessions · 20/100: 15 sessions · ATR+',
-             note=(f'FicTrac ball rotation × 4 units/rad (as calc_path.py drives Unity), camera clock. Zone minus flanks, '
-                   f'50/50 zone 2: older {fmt(c["split_line_zone2_legacy"]["mean"])}, FicTrac '
-                   f'{fmt(c["split_line_zone2_fictrac"]["mean"])} units/s. 20/100 zone 1: FicTrac '
-                   f'{fmt(c["split_type2_zone1_fictrac"]["mean"])} ({c["split_type2_zone1_fictrac"]["positive"]} sessions), '
-                   f'{fmt(c["split_type2_zone1_fictrac_noburst"]["mean"])} without bursts. Bands: session SEM.'),
+             note=(f'FicTrac ball × 4 units/rad, camera clock; each trial’s bin speed, then trials and sessions averaged equally. '
+                   f'Zone minus flanks, 50/50 zone 2: {fmt(c["split_line_zone2_fictrac_eq"]["mean"])} with bursts, '
+                   f'{fmt(c["split_line_zone2_fictrac_eq_noburst"]["mean"])} without (older {fmt(c["split_line_zone2_legacy"]["mean"])}). '
+                   f'20/100 zone 1 without bursts: {fmt(c["split_type2_zone1_fictrac_eq_noburst"]["mean"])} '
+                   f'({c["split_type2_zone1_fictrac_eq_noburst"]["positive"]}). Bands: session SEM.'),
              **common),
         dict(file='fictrac_example.png', diagnostic='fictrac_example',
              title='The fast steps are real ball movements, not Unity logging errors.',

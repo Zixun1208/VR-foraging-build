@@ -88,3 +88,21 @@ They make up 0.06% of tracked time, so they barely change time-weighted speeds.
 python3 fictrac_speed_profile.py [--burst 45] [--out DIR]
 python3 burst_enrichment.py
 ```
+
+## Update Nov 11: equal-trial averaging on the ball data
+
+`fictrac_eq` / `fictrac_eq_noburst` in `session_profiles.csv` use the older deck's weighting. Each
+trial's own bin speed is computed first, then trials and sessions are averaged equally. With this
+weighting the bumps reappear on FicTrac, larger than on Unity because FicTrac sees the full burst
+speed. They come from the bursts:
+
+| Probing, zone minus flanks | equal-trial | equal-trial, bursts removed | time-weighted |
+|---|---:|---:|---:|
+| Split 50/50, zone 2 | +3.58 (12/12) | +0.02 (8/12) | −0.03 (6/12) |
+| Split 50/50, zone 1 | +2.12 (11/12) | +0.72 (10/12) | +0.23 (7/12) |
+| Split 20/100, zone 1 | +2.73 (14/15) | +1.17 (15/15) | +0.71 (14/15) |
+| Split 20/100, zone 2 | +2.27 (13/15) | +0.43 (9/15) | +0.16 (9/15) |
+
+A trial that bursts through a bin in about 10 ms counts as much as a trial that spends seconds
+there, so equal-trial averaging answers "how fast is a typical pass" and time weighting answers
+"how fast does the fly move while here". Deck slide 26 now shows the equal-trial version.

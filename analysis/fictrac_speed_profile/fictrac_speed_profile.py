@@ -18,7 +18,9 @@ episode is padded by 2 frames on each side when it is excluded from the "no burs
 
 Outputs (in ``--out``):
   session_profiles.csv   per cohort/session/phase/bin: time, path, forward, backward for
-                         FicTrac (all frames and without bursts) and Unity (start-bin, same bins)
+                         FicTrac (all frames and without bursts) and Unity (start-bin, same bins);
+                         fictrac_eq / fictrac_eq_noburst = equal-trial mean of each trial's own
+                         bin speed (the older deck's weighting), the rest are time-weighted
   bursts.csv             one row per burst episode: position, zone, speed, displacement, error
   trial_checks.csv       per trial: frames, coverage, end position from FicTrac vs Unity
   zone_contrasts.csv     zone minus flank speed per session/phase/metric (deck definition)
@@ -57,7 +59,7 @@ ZONES = {1: ((20, 40), [(10, 20), (40, 50)]), 2: ((100, 120), [(90, 100), (120, 
 EDGES = [20, 40, 100, 120]
 MAX_GAP_S = 2.0
 MERGE, PAD = 3, 2
-METRICS = ["unity", "fictrac", "fictrac_noburst", "fictrac_fwd", "fictrac_noburst_fwd"]
+METRICS = ["unity", "fictrac", "fictrac_noburst", "fictrac_fwd", "fictrac_noburst_fwd", "fictrac_eq", "fictrac_eq_noburst"]
 COLORS = {"unity": "#8a8a8a", "fictrac": "#1f6fb4", "fictrac_noburst": "#d1495b", "legacy": "#b8860b"}
 NAMES = {"unity": "Unity log (time-weighted)", "fictrac": "FicTrac, all frames",
          "fictrac_noburst": "FicTrac, bursts removed", "legacy": "older deck curve (Unity, equal trials)"}
@@ -196,6 +198,11 @@ def collect(audit, burst, cohorts):
                     checks.append(dict(cohort=cohort, session_id=sid, phase=phase, trial=r.trial, status="no frames"))
                     continue
                 prof, rows, check, trace = res
+                # equal-trial terms: each trial's own bin speed counts once (the older deck recipe)
+                for pre, path_k, time_k in (("eq", "fic_path", "fic_time"), ("eqnb", "nb_path", "nb_time")):
+                    has = prof[time_k] > 0
+                    prof[pre + "_sum"] = np.divide(prof[path_k], prof[time_k], out=np.zeros(100), where=has)
+                    prof[pre + "_n"] = has.astype(float)
                 acc = prof if acc is None else {k: acc[k] + prof[k] for k in acc}
                 for b in rows:
                     bursts.append(dict(cohort=cohort, session_id=sid, phase=phase, trial=r.trial, **b))
@@ -219,6 +226,8 @@ def speeds(p):
     p["fictrac_noburst"] = r("nb_path", "nb_time")
     p["fictrac_fwd"] = r("fic_fwd", "fic_time")
     p["fictrac_noburst_fwd"] = r("nb_fwd", "nb_time")
+    p["fictrac_eq"] = r("eq_sum", "eq_n")
+    p["fictrac_eq_noburst"] = r("eqnb_sum", "eqnb_n")
     return p
 
 
