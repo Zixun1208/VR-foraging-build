@@ -136,3 +136,12 @@ bursts, not an automated classification of all of them.
 
     scp 'kazama-pc-2:fictrac/foraging/*/fictrac-raw-<stamp>.avi' 'kazama-pc-2:fictrac/foraging/*/fictrac-vidLogFrames-<stamp>.txt' VIDEO_DIR/
     python3 burst_video.py --video VIDEO_DIR --out video_check --n 4
+
+### More examples: full-frame clips
+
+`burst_clips.py` writes one uncropped MP4 per burst: 3 random probing in-zone bursts per session
+from the same 5 sessions, 15 clips with seed 1. Each covers 30 frames before to 40 after onset at
+1/10 speed (about 7 s), labelled with session, trial, X, burst length, peak speed and frame offset.
+In the deck folder they are in `video_check/clips/` (with `clips.csv`).
+
+    python3 burst_clips.py --video VIDEO_DIR --out video_check/clips --n 3
