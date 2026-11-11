@@ -35,6 +35,9 @@ BACKUP = B / 'before_fictrac_20261110'
 SECTION = FD.APPENDIX_BUMP
 PURPLE = '#8454A0'
 COH = [('split_line', '50/50', 'zone 2'), ('split_type2', '20/100', 'zone 1')]
+ALL = [('past_50_50', 'Gr64f 50/50'), ('split_line', 'Split 50/50'),
+       ('split_type3', 'Split 50/50 rev. V'), ('split_type2', 'Split 20/100')]   # Gr64f 20/100: no FicTrac logs
+YMAX = 6.0
 EXAMPLE = dict(cohort='split_line', session='split_line:2026-09-03_sub-2',
                trial='probing_iter_49_trial_1_20260903_160247_022.csv')
 
@@ -103,7 +106,7 @@ def figures():
     # 2. example trial: the burst in the raw ball data
     a = pd.read_csv(FT.AUDIT)
     path = a[(a.session_id == EXAMPLE['session']) & (a.trial == EXAMPLE['trial'])].path.iloc[0]
-    f = FT.load_dat(str(Path(path).parents[1]))
+    f = FT.load_dat(sorted(Path(path).parents[1].glob("fictrac-*.dat")))
     _, rows, check, tr = FT.trial(f, path, 45.0)
     i = np.flatnonzero(tr['flag'])
     tc = tr['t'][i[0]]
@@ -140,31 +143,37 @@ def figures():
                          frame_interval_ms=float(np.median(np.diff(f[:, 3])) * 1e-6),
                          max_error=float(rows[0]['max_err']), error_before=float(rows[0]['err_before']))
 
-    # 3. where bursts start, training vs probing
-    fig, axes = plt.subplots(2, 2, figsize=(14, 4.9), sharex=True)
+    # 3. where bursts start, training vs probing, every line and condition with FicTrac logs
+    fig, axes = plt.subplots(2, len(ALL), figsize=(14, 4.9), sharex=True, sharey=True)
     edges = FT.BINS
-    for r_, (c, task, _) in enumerate(COH):
-        for k, ph in enumerate(['training', 'probing']):
+    for k, (c, label) in enumerate(ALL):
+        for r_, ph in enumerate(['training', 'probing']):
             ax = axes[r_, k]
-            mins = prof[(prof.cohort == c) & (prof.phase == ph)].groupby('bin').fic_time.sum().reindex(range(100)).fillna(0).values / 60
+            sel = (prof.cohort == c) & (prof.phase == ph)
+            mins = prof[sel].groupby('bin').fic_time.sum().reindex(range(100)).fillna(0).values / 60
             e = bursts[(bursts.cohort == c) & (bursts.phase == ph)]
             long_ = np.histogram(e[e.frames >= 3].start_x, edges)[0]
             short = np.histogram(e[e.frames < 3].start_x, edges)[0]
             rate = lambda n: np.divide(n, mins, out=np.zeros(100), where=mins > 0)
+            tot = rate(long_) + rate(short)
             ax.bar(FT.POS, rate(long_), width=1.3, color=PURPLE, label='3+ frames')
             ax.bar(FT.POS, rate(short), width=1.3, bottom=rate(long_), color='#C9C1D3', label='1–2 frames')
+            for j in np.flatnonzero(tot > YMAX):   # clipped bars carry their value
+                ax.text(FT.POS[j] + 2, YMAX * .9, f'{tot[j]:.0f} ↑', fontsize=9, color=MUTED)
             for lo in [20, 100]:
                 ax.axvspan(lo, lo + 20, color='#F0AE3E', alpha=.14, zorder=0, lw=0)
             ax.set_xlim(0, 130)
-            ax.set_ylim(0, 5.5)
-            ax.set_title(f'{task} · {ph}', fontsize=13, pad=3)
+            ax.set_ylim(0, YMAX)
+            ax.set_xticks([0, 40, 80, 120])
+            n = prof[sel].session_id.nunique()
+            ax.set_title(f'{label} · {ph} · {n} sess.', fontsize=11, pad=3)
             ax.grid(alpha=.12)
     for ax in axes[:, 0]:
         ax.set_ylabel('Bursts / min')
     for ax in axes[1]:
-        ax.set_xlabel('Corridor position at burst onset (units)')
-    axes[0, 1].legend(frameon=False, fontsize=11, loc='upper center')
-    fig.tight_layout(h_pad=.4)
+        ax.set_xlabel('Position at onset')
+    axes[0, -1].legend(frameon=False, fontsize=10, loc='upper center')
+    fig.tight_layout(h_pad=.4, w_pad=.6)
     fig.savefig(F / 'fictrac_burst_rate.png', dpi=210, facecolor='white')
     plt.close(fig)
     long_e = enr[enr.kind == '3+ frames']
@@ -201,14 +210,13 @@ def slides(ev):
                    f'units/s steps. Tracking error rises (≈{x["error_before"]:.0f} → {x["max_error"]:.0f}) but stays under the cutoff.'),
              **common),
         dict(file='fictrac_burst_rate.png', diagnostic='fictrac_bursts',
-             title='Fast ball bursts cluster in the reward zones during probing, when the light is off.',
-             coverage='Split line · 50/50: 12 sessions · 20/100: 15 sessions · ATR+ · burst = frames above 45 units/s',
-             note=(f'Bursts of 3+ frames start more often inside than outside the zones in '
-                   f'{e["split_line_probing"]["zone_higher"]}/{e["split_line_probing"]["sessions"]} (50/50) and '
-                   f'{e["split_type2_probing"]["zone_higher"]}/{e["split_type2_probing"]["sessions"]} (20/100) probing sessions; '
-                   f'{ev["split_probing_bursts"]["forward"]:.0%} move forward. Probing has no LED flashes. '
-                   f'Whether bursts are runs, jumps or kicks is unknown.'),
-             **common),
+             title='Probing bursts cluster in the zones, most clearly in the split line.',
+             coverage='All lines and conditions with FicTrac logs · ATR+ · burst = frames above 45 units/s · Gr64f 20/100: no FicTrac logs',
+             note=('Sessions where 3+ frame bursts start more often in the zones than outside, probing: '
+                   + ', '.join(f'{lab} {e[c + "_probing"]["zone_higher"]}/{e[c + "_probing"]["sessions"]}' for c, lab in ALL)
+                   + f'. Split-line probing bursts: {ev["split_probing_bursts"]["forward"]:.0%} forward. '
+                   'Probing has no LED flashes. Whether bursts are runs, jumps or kicks is unknown.'),
+             **dict(common, cohorts=[c for c, _ in ALL])),
     ]
 
 
@@ -240,7 +248,7 @@ def main():
     ids = list(deck.r.slides._sldIdLst)
     pages = list(deck.pages)
     new = list(range(before, len(pages)))
-    anchor = max(i for i in range(before) if pages[i]['section'] == SECTION)
+    anchor = max(i for i in range(before) if pages[i]['section'] == SECTION and not pages[i].get('burst_detail'))
     order = list(range(anchor + 1)) + new + list(range(anchor + 1, before))
     for sid in ids:
         deck.r.slides._sldIdLst.remove(sid)

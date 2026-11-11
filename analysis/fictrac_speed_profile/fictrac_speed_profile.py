@@ -50,7 +50,9 @@ COHORTS = {  # cohort id in the deck -> label, protocol
     "split_type2": ("Split line 20/100", "20/100"),
     "past_50_50": ("Gr64f 50/50", "50/50"),
     "past_20_100": ("Gr64f 20/100", "20/100"),
+    "split_type3": ("Split line 50/50 reversed V", "50/50"),
 }
+FICTRAC_LOGS = os.path.expanduser("~/fictrac/foraging")   # FicTrac's own run folders, <YYYYMMDD>_<HHMMSS>/
 CORRIDOR = 130.0
 GAIN = 4.0                       # calc_path.py gain_dz: corridor units per radian of ball roll
 BINS = np.linspace(0, CORRIDOR, 101)
@@ -65,10 +67,31 @@ NAMES = {"unity": "Unity log (time-weighted)", "fictrac": "FicTrac, all frames",
          "fictrac_noburst": "FicTrac, bursts removed", "legacy": "older deck curve (Unity, equal trials)"}
 
 
-def load_dat(sub_dir):
-    """frame, err, dy, cam_ns, sys_ms for every FicTrac .dat in a session, sorted by sys_ms."""
+def find_dats(sub_dir, date, t_range):
+    """The session's own .dat files; if there are none, FicTrac run logs from the same date whose
+    system-clock span overlaps the session's trials (older sessions kept the .dat only there)."""
+    own = sorted(glob.glob(os.path.join(sub_dir, "fictrac-*.dat")))
+    if own:
+        return own, "session folder"
+    hits = []
+    for p in sorted(glob.glob(os.path.join(FICTRAC_LOGS, date.replace("-", "") + "_*", "fictrac-*.dat"))):
+        try:
+            first = float(open(p).readline().split(",")[24])
+            last = float(pd.read_csv(p, header=None, usecols=[24]).iloc[-1, 0])
+        except (OSError, ValueError, IndexError):
+            continue
+        if first <= t_range[1] and last >= t_range[0]:
+            hits.append(p)
+    return hits, "~/fictrac/foraging"
+
+
+def load_dat(paths):
+    """frame, err, dy, cam_ns, sys_ms for the given FicTrac .dat files, sorted by sys_ms.
+    A session folder (str) is also accepted: its own fictrac-*.dat files are used."""
+    if isinstance(paths, (str, os.PathLike)):
+        paths = sorted(glob.glob(os.path.join(paths, "fictrac-*.dat")))
     parts = []
-    for p in sorted(glob.glob(os.path.join(sub_dir, "fictrac-*.dat"))):
+    for p in paths:
         try:
             parts.append(pd.read_csv(p, header=None, usecols=[0, 4, 6, 21, 24]).to_numpy(float))
         except (OSError, ValueError):
@@ -186,10 +209,15 @@ def collect(audit, burst, cohorts):
     sessions = list(a.groupby(["cohort", "session_id"], sort=False))
     for n, ((cohort, sid), g) in enumerate(sessions, 1):
         sub = os.path.dirname(os.path.dirname(g.path.iloc[0]))
-        f = load_dat(sub)
+        starts = [pd.read_csv(p, usecols=[0], nrows=1).iloc[0, 0] for p in g.path]
+        date = sid.split(":")[1][:10]
+        dats, where = find_dats(sub, date, (min(starts), max(starts) + 900e3))
+        f = load_dat(dats)
         if f is None:
-            print(f"  [skip] {sid}: no FicTrac .dat")
+            print(f"  [skip] {sid}: no FicTrac .dat in the session folder or {FICTRAC_LOGS}")
             continue
+        if where != "session folder":
+            print(f"  {sid}: FicTrac log from {where}: {[os.path.basename(d) for d in dats]}")
         for phase, gp in g.groupby("phase"):
             acc = None
             for r in gp.itertuples():
@@ -395,7 +423,7 @@ def main():
 
     ok = checks[checks.status == "ok"]
     print(f"\ntrials ok {len(ok)}/{len(checks)}; median |end X FicTrac - Unity| = "
-          f"{np.median(np.abs(ok.end_x_fictrac - ok.end_x_unity)):.2f} units; "
+          f"{np.median(np.minimum(np.abs(ok.end_x_fictrac - ok.end_x_unity), CORRIDOR - np.abs(ok.end_x_fictrac - ok.end_x_unity))):.2f} units (circular); "
           f"FicTrac/Unity duration median {np.median(ok.fictrac_s / ok.unity_s):.4f}")
     print(f"bursts: {len(bursts)} episodes, {ok.bursts.gt(0).mean():.1%} of trials have one, "
           f"{ok.burst_time_s.sum() / ok.fictrac_s.sum():.3%} of time, "
