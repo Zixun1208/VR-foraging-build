@@ -106,3 +106,33 @@ speed. They come from the bursts:
 A trial that bursts through a bin in about 10 ms counts as much as a trial that spends seconds
 there, so equal-trial averaging answers "how fast is a typical pass" and time weighting answers
 "how fast does the fly move while here". Deck slide 26 now shows the equal-trial version.
+
+## Update Nov 11: video check of the bursts
+
+The rig PC (`ssh kazama-pc-2`, `~/fictrac/foraging/<run>/`) has FicTrac raw camera video
+(`fictrac-raw-<stamp>.avi`, 720×540 at 96.4 fps) and `fictrac-vidLogFrames-<stamp>.txt` for all 29
+split-line sessions. Line *i* of the frame log is the FicTrac frame counter written as video frame
+*i*. That maps a burst's `.dat` time to an exact video frame. The AVIs have almost no keyframes, so
+`burst_video.py` decodes each video once and uses ffmpeg's `select` filter rather than seeking.
+
+`burst_video.py` drew random events from 5 sessions with the most bursts: split 50/50 09-03 sub-2,
+09-11 sub-1, 09-17 sub-2; split 20/100 10-09 sub-2, 10-14 sub-1. It took 4 of each kind per
+session. `video_check/` holds the sheets (`sheet_*.png`, `fly_*.png` zoomed on the fly) and
+`events.csv`.
+
+- **Bursts** (probing, in zone, 3-30 frames): in all 20 the ball is motion-blurred for about 6
+  frames (60 ms) and its pattern has jumped afterwards, so the ball really spins. In most of them
+  the wings show as a blur halo at onset and the legs lift or extend: a brief flight attempt or
+  jump that kicks the ball.
+- **Controls** (in zone, at least 2 s from any burst): the ball stays sharp and the fly stands or
+  walks.
+- **Single-frame spikes**: mostly ordinary stepping with a sharp ball, so tracking noise. One
+  (09-03, X=35) is a short wing-and-spin event split by the burst definition.
+
+`video_check/example_burst_20260903_sub2_slow.mp4` is the deck's example trial at 1/10 speed. The
+burst is a flight attempt: wings beat for about 100 ms and the ball spins. This sample shows the
+bursts are real fly behaviour, not tracking or logging artifacts. It is a visual check of 20
+bursts, not an automated classification of all of them.
+
+    scp 'kazama-pc-2:fictrac/foraging/*/fictrac-raw-<stamp>.avi' 'kazama-pc-2:fictrac/foraging/*/fictrac-vidLogFrames-<stamp>.txt' VIDEO_DIR/
+    python3 burst_video.py --video VIDEO_DIR --out video_check --n 4
